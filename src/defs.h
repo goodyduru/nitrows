@@ -2,9 +2,9 @@
 #define INCLUDED_DEFS_DOT_H
 
 /** 
- * Represents the string that is concatenated to the Sec-Websocket-Key received from the client, 
- * before the concatenated string is hashed and encoded with base64 which is then set as
- * Sec-Websocket-Accept header value.
+ * Represents the string that is concatenated to the Sec-Websocket-Key received
+ * from the client, before the concatenated string is hashed and encoded with 
+ * base64 which is then set as Sec-Websocket-Accept header value.
  **/
 #define GUID "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
@@ -16,13 +16,16 @@ enum {
     // The only supported version of websocket
     WEBSOCKET_VERSION = 13, 
 
-    // Expected length of the Sec-Websocket-Key sent by the client during handshake
+    // Expected length of the Sec-Websocket-Key sent by the client during 
+    // handshake
     WEBSOCKET_KEY_LENGTH = 16,
 
-    // Minimum size of a frame header to determine if we start to process the header or not.
+    // Minimum size of a frame header to determine if we start to process the 
+    // header or not.
     MINIMUM_FRAME_HEADER_SIZE = 5,
 
-    // Maximum payload data that we can handle. This is temp to make dev easier. We'll like this to be configurable
+    // Maximum payload data that we can handle. This is temp to make dev 
+    // easier. We'll like this to be configurable
     MAX_PAYLOAD_SIZE = 100 * 1024 * 1024,
 
     // Array size for hashtable containing all the connected clients
@@ -34,8 +37,9 @@ enum opcode {
     CONTINUATION = 0, 
     TEXT = 1,
     BINARY = 2,
-    // This isn't yet defined by the websocket protocol. We just use this as a threshold to determine if a
-    // frame is control or data. Any frame greater than this is control else data.
+    // This isn't yet defined by the websocket protocol. We just use this as a 
+    // threshold to determine if a frame is control or data. Any frame greater 
+    // than this is control else data.
     THRESHOLD = 7,
     CLOSE = 8,
     PING = 9,

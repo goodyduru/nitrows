@@ -84,17 +84,17 @@ typedef struct wsclient_node wsclient_node;
 /**
  * A list node containing a client. It will be used in the hashtable containing 
  * the clients
- * */
+ */
 struct wsclient_node {
     // TODO: Test this with and without this member for performance comparision.
     int client_socketfd;
 
-    wsclient *current;
+    wsclient *client;
     wsclient_node *next;
 };
 
 // Table containing all the connected clients.
-wsclient clients_table[HASHTABLE_SIZE];
+wsclient_node *clients_table[HASHTABLE_SIZE];
 
 /**
  * Initialize a websocket client structure and add it to the client table.
@@ -102,7 +102,15 @@ wsclient clients_table[HASHTABLE_SIZE];
  * @param socketfd  Client socket descriptor
  * @return created client struct
  */
-wsclient *init_wsclient(int socketfd);
+wsclient *init_wsclient(int socketfd);  
+
+/**
+ * Get a websocket client from the client table.
+ * 
+ * @param socketfd Client socket descriptor
+ * @return client struct
+ */
+wsclient *get_wsclient(int socketfd);
 
 /**
  * Delete a client from the client table. Once that's done, free its members 
@@ -111,5 +119,10 @@ wsclient *init_wsclient(int socketfd);
  * @param client Pointer to client struct
  */
 void delete_wsclient(wsclient *client);
+
+/**
+ * Internal function, free client and its members.
+ */
+void __free_wsclient(wsclient *client);
 
 #endif // Included clients.h

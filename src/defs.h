@@ -29,11 +29,21 @@ enum {
     MAX_PAYLOAD_SIZE = 100 * 1024 * 1024,
 
     // Array size for hashtable containing all the connected clients
-    HASHTABLE_SIZE = 1024
+    HASHTABLE_SIZE = 1024,
+
+    // Port number
+    PORT = 8010,
+
+    // Listener backlog for the listen call. Shamelessly copied from nginx
+    LISTEN_BACKLOG = 511,
+
+    // Initial event size
+    INITIAL_EVENT_SIZE = 16
 };
 
+typedef enum Opcode Opcode;
 // This defines the specified opcode types in a websocket data frame.
-enum opcode {
+enum Opcode {
     CONTINUATION = 0, 
     TEXT = 1,
     BINARY = 2,
@@ -46,8 +56,9 @@ enum opcode {
     PONG = 10
 };
 
+typedef enum Status_code Status_code;
 // This defines the allowed status code used in a websocket close frame.
-enum status_code {
+enum Status_code {
     NORMAL = 1000,
     AWAY = 1001,
     PROTOCOL_ERROR = 1002,
@@ -59,6 +70,7 @@ enum status_code {
     UNEXPECTED_CONDITION = 1011
 };
 
-enum connection_status { CONNECTED = 0, CLOSING, CLOSED };
+typedef enum Connection_status Connection_status;
+enum Connection_status { CONNECTED = 0, CLOSING, CLOSED };
 
 #endif // Included defs.h

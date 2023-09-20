@@ -1,11 +1,11 @@
 #ifndef INCLUDED_CLIENTS_DOT_H
 #define INCLUDED_CLIENTS_DOT_H
 
-#include <stdint.h>
+#include <stdbool.h>
 
-#include "defs.h"
+#include "./defs.h"
 
-typedef struct wsclient wsclient;
+typedef struct Client Client;
 
 /**
  * This struct defines the different attributes of a connected websocket 
@@ -18,9 +18,9 @@ typedef struct wsclient wsclient;
  * struct tries to define several attributes that can make it easier for our 
  * code to process these scenarios.
  */
-struct wsclient {
+struct Client {
     int socketfd; // client socket descriptor
-    connection_status status;
+    Connection_status status;
 
     // A client can send multiple fragments of data. We need to know if the 
     // currently processed frame is the final frame so that the data can be
@@ -52,7 +52,7 @@ struct wsclient {
     char mask[4];
 
     // Type of control frame being processed.
-    opcode control_type;
+    Opcode control_type;
 
     // This one is an optimization. Most control data will contain at most just 
     // the status code which is 2 bytes. But, some will contain the reason. We 
@@ -65,7 +65,7 @@ struct wsclient {
 
     // Type of data frame being processed. This holds across multiple frames of 
     // fragmented data
-    opcode data_type;
+    Opcode data_type;
 
     // The payload of a data frame has to be stored somewhere. These last 3 
     // elements handle everything concerning this. These values hold across 
@@ -79,22 +79,22 @@ struct wsclient {
     char buffer[];
 };
 
-typedef struct wsclient_node wsclient_node;
+typedef struct Node Node;
 
 /**
  * A list node containing a client. It will be used in the hashtable containing 
  * the clients
  */
-struct wsclient_node {
+struct Node {
     // TODO: Test this with and without this member for performance comparision.
     int client_socketfd;
 
-    wsclient *client;
-    wsclient_node *next;
+    Client *client;
+    Node *next;
 };
 
 // Table containing all the connected clients.
-wsclient_node *clients_table[HASHTABLE_SIZE];
+Node *clients_table[HASHTABLE_SIZE];
 
 /**
  * Initialize a websocket client structure and add it to the client table.
@@ -102,7 +102,7 @@ wsclient_node *clients_table[HASHTABLE_SIZE];
  * @param socketfd  Client socket descriptor
  * @return created client struct
  */
-wsclient *init_wsclient(int socketfd);  
+Client *init_client(int socketfd);  
 
 /**
  * Get a websocket client from the client table.
@@ -110,7 +110,7 @@ wsclient *init_wsclient(int socketfd);
  * @param socketfd Client socket descriptor
  * @return client struct
  */
-wsclient *get_wsclient(int socketfd);
+Client *get_client(int socketfd);
 
 /**
  * Delete a client from the client table. Once that's done, free its members 
@@ -118,11 +118,11 @@ wsclient *get_wsclient(int socketfd);
  *
  * @param client Pointer to client struct
  */
-void delete_wsclient(wsclient *client);
+void delete_client(Client *client);
 
 /**
  * Internal function, free client and its members.
  */
-void __free_wsclient(wsclient *client);
+void __free_client(Client *client);
 
 #endif // Included clients.h

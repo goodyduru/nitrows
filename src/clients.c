@@ -2,18 +2,18 @@
 
 #include "./clients.h"
 
-wsclient *init_wsclient(int socketfd) {
+Client *init_client(int socketfd) {
     int index; // Position of client in hashtable.
     // This is what is actually stored in the table. It contains the client too
-    wsclient_node *node; 
-    wsclient *client; // This is what we are trying to create
+    Node *node; 
+    Client *client; // This is what we are trying to create
 
     // We use calloc because we want to zero out the memory on initialization.
-    node = (wsclient_node *)calloc(1, sizeof(wsclient_node));
+    node = (Node *)calloc(1, sizeof(Node));
 
     // We need to allocate memory for the client including its buffer. 
     // We can always increase the size of the buffer as data is received
-    client = (wsclient *)calloc(1, sizeof(wsclient) + BUFFER_SIZE);
+    client = (Client *)calloc(1, sizeof(Client) + BUFFER_SIZE);
 
     // Initialize the client with some of its members default values.
     client->socketfd = socketfd;
@@ -30,9 +30,9 @@ wsclient *init_wsclient(int socketfd) {
     return client;
 }
 
-wsclient *get_wsclient(int socketfd) {
+Client *get_Client(int socketfd) {
     int index; // Index in the table
-    wsclient_node *node;
+    Node *node;
 
     // We get the index of the client using the socket descriptor as 
     // key. We then search the linked list to get the node containing
@@ -52,17 +52,17 @@ wsclient *get_wsclient(int socketfd) {
     return node->client;
 }
 
-void delete_wsclient(wsclient *client) {
-    int socketfd, index;
+void delete_Client(Client *client) {
+    int index;
     // We need both of these variables to delete from the linked list.
-    wsclient_node *prev, *current;
+    Node *prev, *current;
 
     index = client->socketfd % HASHTABLE_SIZE;
 
     prev = clients_table[index];
     // Nothing is found in table. That will be strange, but we want to be robust
     if ( prev == NULL ) {
-        __free_wsclient(client);
+        __free_client(client);
         return;
     }
 
@@ -71,7 +71,7 @@ void delete_wsclient(wsclient *client) {
     if ( prev->client == client ) {
         current = prev;
         clients_table[index] = current->next;
-        __free_wsclient(client);
+        __free_client(client);
         free(current);
         return;
     }
@@ -86,13 +86,13 @@ void delete_wsclient(wsclient *client) {
     }
 
     // Free client, and if container node was found, free it too.
-    __free_wsclient(client);
+    __free_client(client);
     if ( current != NULL )
         free(current);
     return;
 }
 
-void __free_wsclient(wsclient *client) {
+void __free_client(Client *client) {
     if ( client->control_extra_data != NULL )
         free(client->control_extra_data);
     free(client->buffer);

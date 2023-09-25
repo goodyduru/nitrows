@@ -49,12 +49,12 @@ int get_listener_socket() {
 
     // Return error if we didn't get bound
     if ( p == NULL ) {
-        printf("No bound");
+        perror("bind");
         return -1;
     }
 
     if ( listen(listener, LISTEN_BACKLOG) == -1 ) {
-        printf("Could not listen");
+        perror("listen");
         return -1;
     }
 
@@ -81,7 +81,7 @@ void accept_connection(listener_socket) {
     addrlen = sizeof remote_addr;
     newfd = accept(&listener_socket, &remote_addr, addrlen);
     if ( newfd ==  -1 ) {
-        printf("accept error");
+        printf("accept");
     }
     add_to_event_loop(newfd);
     printf("New connection from %s\n", inet_ntop(remote_addr.ss_family, get_in_addr((struct sockaddr*)&remote_addr), ip_addr, INET6_ADDRSTRLEN));

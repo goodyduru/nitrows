@@ -2,6 +2,7 @@
 #define INCLUDED_CLIENTS_DOT_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "./defs.h"
 
@@ -108,7 +109,7 @@ Client *init_client(int socketfd);
  * Get a websocket client from the client table.
  * 
  * @param socketfd Client socket descriptor
- * @return client struct
+ * @return client struct. Null if not found
  */
 Client *get_client(int socketfd);
 

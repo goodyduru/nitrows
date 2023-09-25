@@ -58,7 +58,7 @@ void run_event_loop(int listener, void (*handle_listener)(int),
     while(1) {
         int poll_count = poll(event.objects, event.count, -1);
         if ( poll_count == -1 ) {
-            printf("warning"); // TODO: change this
+            perror("poll"); // TODO: change this
             exit(1); // Remove this
         }
 

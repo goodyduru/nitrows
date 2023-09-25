@@ -39,7 +39,7 @@ void add_to_event_loop(int socketfd);
 
 /**
  * Deletes file descriptor from event loop. We will decrease the event object
- * array size if the number of file descriptors falls below a threshold.
+ * array size if the number of file descriptors falls below a chosen threshold.
  * 
  * @param socketfd socket descriptor to be deleted
  * @param index index of the socket descriptor. Set to -1 if not known.
@@ -51,9 +51,9 @@ void delete_from_event_loop(int socketfd, int index);
  * them with any of the handler functions.
  * 
  * @param listener listener socket
- * @param handle_listener function that runs if it's the listener file
- * descriptor that is ready to be read.
- * @param handle_others function that runs if it's other file desc.
+ * @param handle_listener function that runs if it's the listener socket
+ * that is ready to be read.
+ * @param handle_others function that runs if it's other sockets.
 */
 void run_event_loop(int listener, void (*handle_listener)(int), 
                     void (*handle_others(int)));

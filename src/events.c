@@ -33,7 +33,7 @@ void delete_from_event_loop(int socketfd, int index) {
         }
     }
 
-    // Socket fd wasn't found
+    // Socket wasn't found
     if ( index == -1 )
         return;
     
@@ -59,15 +59,15 @@ void run_event_loop(int listener, void (*handle_listener)(int),
         int poll_count = poll(event.objects, event.count, -1);
         if ( poll_count == -1 ) {
             printf("warning"); // TODO: change this
-            exit(1);
+            exit(1); // Remove this
         }
 
         for ( int i = 0; i < event.count; i++ ) {
             // Check to see if any is ready and handle them with their
             // respective functions
             if ( event.objects[i].revents & POLLIN ) {
-                // We handle listener socket differently.
                 if ( event.objects[i].fd == listener ) {
+                    // We handle listener socket differently.
                     handle_listener(listener);
                 } else {
                     handle_others(event.objects[i].fd);

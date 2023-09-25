@@ -37,7 +37,7 @@ enum {
     // Listener backlog for the listen call. Shamelessly copied from nginx
     LISTEN_BACKLOG = 511,
 
-    // Initial event size
+    // Initial number of sockets to be monitored by our event library.
     INITIAL_EVENT_SIZE = 16
 };
 

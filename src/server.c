@@ -31,6 +31,13 @@ void close_connection(int socketfd) {
     delete_from_event_loop(socketfd, -1);
 }
 
+/**
+ * Send http error response and close the connection
+ * 
+ * @param socketfd Client socket descriptor
+ * @param status_code HTTP status code
+ * @param message Response body
+ */
 void send_error_response(int socketfd, int status_code, char message[]) {
     char response[256];
     int length;
@@ -48,9 +55,19 @@ void send_error_response(int socketfd, int status_code, char message[]) {
     close_connection(socketfd);
 }
 
+/**
+ * Check the presence and validity of the `Upgrade` header in the opening
+ * request sent by the client. Send an error response if the check fails
+ * 
+ * @param socketfd Client socket descriptor
+ * @param buf String buffer containing client request
+ * 
+ * @return Validity of the header as a boolean
+ */
 bool is_upgrade_header_valid(int socketfd, char buf[]) {
     char *p;
     int cmp;
+
      // Confirm the presence of header
     if ( (p = strcasestr(buf, "Upgrade:")) == NULL ) {
         send_error_response(socketfd, 400, "Upgrade header not included");
@@ -58,6 +75,8 @@ bool is_upgrade_header_valid(int socketfd, char buf[]) {
     }
     // Get the value of the header and confirm that its value is websocket
     p += 8; // Increment pointer by the length of `Upgrade:`
+
+    // Search for the presence of the first non-whitespace character
     while ( *p == ' ' || *p == '\t' ) {
         p++;
     }
@@ -72,6 +91,18 @@ bool is_upgrade_header_valid(int socketfd, char buf[]) {
     return true;
 }
 
+/**
+ * Check the presence and validity of the `Sec-Websocket-Key` header in the
+ * opening request sent by the client. In addition, get the header value and
+ * check its validity too. Send an error response if any of the checks fail.
+ * Return the header value in the `key` parameter if all the checks succeed.
+ * 
+ * @param socketfd Client socket descriptor
+ * @param buf String buffer containing client request
+ * @param key String buffer that will contain the key header value
+ * 
+ * @return Validity of header as a boolean
+ */
 bool get_sec_websocket_key_value(int socketfd, char buf[], char key[]) {
     char *p, c;
     // Confirm the presence of header
@@ -115,6 +146,15 @@ bool get_sec_websocket_key_value(int socketfd, char buf[], char key[]) {
     return true;
 }
 
+/**
+ * Check the presence and validity of the `Sec-Websocket-Version` header in the
+ * opening request sent by the client. Send an error response if the check fails
+ * 
+ * @param socketfd Client socket descriptor
+ * @param buf String buffer containing client request
+ * 
+ * @return Validity of the header as a boolean
+ */
 bool is_version_header_valid(int socketfd, char buf[]) {
     char *p;
     int cmp;
@@ -142,6 +182,21 @@ bool is_version_header_valid(int socketfd, char buf[]) {
     return true;
 }
 
+/**
+ * Check the presence and validity of the `Sec-Websocket-Protocol` header in
+ * the opening request sent by the client. This header is optional, so absence
+ * of the header is valid. Once there's a value, then it has to have a valid
+ * format. Send an error response if the checks fails. We return the first
+ * subprotocol and its length in the provided parameters.
+ * 
+ * @param socketfd Client socket descriptor
+ * @param buf String buffer containing client request
+ * @param subprotocol This will contain the chosen protocol
+ * @param subprotocol_len This will contain the pointer to the chosen protocol
+ * length
+ * 
+ * @return Validity of the header as a boolean
+ */
 bool get_subprotocols(int socketfd, char buf[], char subprotocol[],
                                 int *subprotocol_len) {
     char *p, c;
@@ -154,6 +209,8 @@ bool get_subprotocols(int socketfd, char buf[], char subprotocol[],
     while ( *p == ' ' || *p == '\t' ) {
         p++;
     }
+
+    // Check that the value doesn't start with a comma or is empty.
     if ( *p == '\0' || *p == '\r' || *p == '\n' || *p == ',') {
         send_error_response(socketfd, 400,
                             "Invalid Sec-Websocket-Protocol header");
@@ -170,6 +227,21 @@ bool get_subprotocols(int socketfd, char buf[], char subprotocol[],
     return true;
 }
 
+/**
+ * Check the presence and validity of the `Sec-Websocket-Extensions` header in
+ * the opening request sent by the client. This header is optional, so absence
+ * of the header is valid. Once there's a value, then it has to have a valid
+ * format. Send an error response if the checks fails. We return the first
+ * extension and its length in the provided parameters.
+ * 
+ * @param socketfd Client socket descriptor
+ * @param buf String buffer containing client request
+ * @param extension This will contain the chosen extension
+ * @param extension_len This will contain the pointer to the chosen extension
+ * length
+ * 
+ * @return Validity of the header as a boolean
+ */
 bool get_extensions(int socketfd, char buf[], char extension[],
                                 int *extension_len) {
     char *p, c;
@@ -202,7 +274,7 @@ void handle_upgrade(int socketfd) {
     int nbytes; // Size Of upgrade request
     char *p;
     char buf[BUFFER_SIZE]; // Buffer that holds request
-    char key[24]; // Buffer that holds sec-websocket-key value
+    char key[60]; // Buffer that holds sec-websocket-accept value
     char subprotocol[32];
     char extension[32];
     int subprotocol_len, extension_len;
@@ -267,12 +339,14 @@ bool __send_upgrade_response(int socketfd, char key[], char subprotocol[],
                             int subprotocol_len, char extension[],
                             int extension_len) {
     int length;
-    unsigned char accept[60], sha1[20], base64[28], response[256];
+    unsigned char sha1[20], base64[29], response[256];
     // Create `Sec-WebSocket-Accept` value
-    strncpy(accept, key, 24);
-    strncpy(accept+24, GUID, 36);
-    SHA1(accept, 60, sha1);
+    strncpy(key+24, GUID, 36);
+    SHA1(key, 60, sha1);
     base64_encode(sha1, base64, 20);
+    base64[28] = '\0';
+
+    // Format response based on the presence of subprotocols and extensions
     if ( subprotocol_len > 0 && extension_len > 0 ) {
         length = sprintf(response, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\nSec-WebSocket-Protocol: %s\r\nSec-WebSocket-Extensions: %s\r\n", base64, subprotocol, extension);
     } else if ( subprotocol_len > 0 ) {

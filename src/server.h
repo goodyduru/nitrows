@@ -24,6 +24,22 @@ void handle_connection(int socketfd);
  */
 void handle_upgrade(int socketfd);
 
+/**
+ * Send upgrade response handshake to a correct client handshake. The response might include a subprotocol or/and extension header if the request contained them.
+ * 
+ * @param socketfd Client socket descriptor
+ * @param key Contains the Sec-Websocket-Key value. This function will
+ * concatenate its value and the GUID and add them to the buffer.
+ * @param subprotocol Contains the first protocol from the request's
+ * Sec-Websocket-Protocol values. Can be empty
+ * @param subprotocol_len Subprotocol string length. 0 if subprotocol is empty
+ * @param extension Contains the first protocol from the request's
+ * Sec-Websocket-Extensions values. Can be empty
+ * @param extension_len Extension string length. 0 if extension is empty
+ * 
+ * @returns bool true if response is successfully sent, false otherwise
+ * 
+*/
 bool __send_upgrade_response(int socketfd, char key[], char subprotocol[],
                             int subprotocol_len, char extension[],
                             int extension_len);

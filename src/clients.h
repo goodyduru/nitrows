@@ -34,6 +34,9 @@ struct Client {
     // determine where to store the payload data.
     bool is_control_frame;
 
+    // Determine whether we are in the middle of processing a frame or not.
+    bool in_frame;
+
     // It is possible for the header of a frame to be in 2 different network 
     // recv buffers. We need a place to store the header info in this scenario. 
     // The minimum header size is 5, so if a currently processed frame size in 
@@ -50,6 +53,7 @@ struct Client {
     uint64_t added_payload_size;
 
     // Frame mask for the currently processed frame.
+    uint8_t mask_size;
     char mask[4];
 
     // Type of control frame being processed.
@@ -60,8 +64,10 @@ struct Client {
     // need to be able to handle these without wasting space. If the payload 
     // size is less than/equal to 2, we store it in the control_data element. 
     // Else, we allocate space for the control_extra_data element and store the 
-    // rest of the data there.
+    // rest of the data there. The control_data_size element stores the length
+    // of the control data.
     char control_data[2];
+    int control_data_size;
     char *control_extra_data;
 
     // Type of data frame being processed. This holds across multiple frames of 
@@ -72,11 +78,11 @@ struct Client {
     // elements handle everything concerning this. These values hold across 
     // multiple frames of fragmented data. The buffer array contains the data 
     // received so far. The buffer_size element determines the size of received 
-    // data in the buffer array. The buffer_limit element determines the max 
+    // data in the buffer array. The buffer_max_size element determines the max 
     // size of the buffer array. We can increase this size to a limit if it the 
     // array size isn't upto the expected data size.
     uint64_t buffer_size;
-    uint64_t buffer_limit;
+    uint64_t buffer_max_size;
     char buffer[];
 };
 
@@ -125,5 +131,13 @@ void delete_client(Client *client);
  * Internal function, free client and its members.
  */
 void __free_client(Client *client);
+
+/**
+ * Resets a client back to its default state. This is done after sending a
+ * response to the client and there are no data to process.
+ * 
+ * @param client Pointer to client struct
+*/
+void reset_client(Client *client);
 
 #endif // Included clients.h

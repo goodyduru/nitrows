@@ -53,7 +53,8 @@ enum Opcode {
     THRESHOLD = 7,
     CLOSE = 8,
     PING = 9,
-    PONG = 10
+    PONG = 10,
+    INVALID = -1
 };
 
 typedef enum Status_code Status_code;

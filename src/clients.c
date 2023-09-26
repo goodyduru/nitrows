@@ -18,7 +18,10 @@ Client *init_client(int socketfd) {
     // Initialize the client with some of its members default values.
     client->socketfd = socketfd;
     client->status = CONNECTED;
-    client->buffer_limit = BUFFER_SIZE;
+    client->buffer_max_size = BUFFER_SIZE;
+    client->control_type = INVALID;
+    client->data_type = INVALID;
+    client->in_frame = false;
     
     // We are going to use socketfd as the hashtable key
     index = socketfd % HASHTABLE_SIZE;
@@ -30,7 +33,7 @@ Client *init_client(int socketfd) {
     return client;
 }
 
-Client *get_Client(int socketfd) {
+Client *get_client(int socketfd) {
     int index; // Index in the table
     Node *node;
 
@@ -52,7 +55,7 @@ Client *get_Client(int socketfd) {
     return node->client;
 }
 
-void delete_Client(Client *client) {
+void delete_client(Client *client) {
     int index;
     // We need both of these variables to delete from the linked list.
     Node *prev, *current;
@@ -97,4 +100,24 @@ void __free_client(Client *client) {
         free(client->control_extra_data);
     free(client->buffer);
     free(client);
+}
+
+void reset_client(Client *client) {
+    client->is_final_frame = false;
+    client->is_control_frame = false;
+    client->in_frame = false;
+    client->header_size = 0;
+    client->payload_size = 0;
+    client->added_payload_size = 0;
+    client->control_type = INVALID;
+    client->control_data_size = 0;
+    if ( client->control_extra_data != NULL ) {
+        free(client->control_extra_data);
+    }
+    client->data_type = INVALID;
+    client->buffer_size = 0;
+    if ( client->buffer_max_size > BUFFER_SIZE ) {
+        realloc(client->buffer, BUFFER_SIZE);
+        client->buffer_max_size = BUFFER_SIZE;
+    }
 }

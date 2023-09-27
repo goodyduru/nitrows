@@ -7,6 +7,7 @@
  * base64 which is then set as Sec-Websocket-Accept header value.
  **/
 #define GUID "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+#define PORT "8010"
 
 
 enum {
@@ -30,9 +31,6 @@ enum {
 
     // Array size for hashtable containing all the connected clients
     HASHTABLE_SIZE = 1024,
-
-    // Port number
-    PORT = 8010,
 
     // Listener backlog for the listen call. Shamelessly copied from nginx
     LISTEN_BACKLOG = 511,

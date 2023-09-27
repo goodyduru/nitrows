@@ -1,9 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <unistd.h>
 
 #include "defs.h"
 #include "events.h"
@@ -79,7 +81,7 @@ void accept_connection(listener_socket) {
     char ip_addr[INET6_ADDRSTRLEN];
 
     addrlen = sizeof remote_addr;
-    newfd = accept(&listener_socket, &remote_addr, addrlen);
+    newfd = accept(listener_socket, (struct sockaddr *)&remote_addr, &addrlen);
     if ( newfd ==  -1 ) {
         printf("accept");
     }

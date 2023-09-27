@@ -52,32 +52,21 @@ bool __send_upgrade_response(int socketfd, char key[], char subprotocol[],
 void close_client(Client* client);
 
 /**
- * Handles data frame from a client. This is only for clients that are in our
+ * Handles from a client. This is only for clients that are in our
  * connection table.
  * 
  * @param client Connected client
 */
-void handle_frame(Client* client);
+void handle_client_data(Client* client);
 
 /**
- * Handles new data frame from a client.
+ * Send a frame to a client.
  * 
  * @param client Connected client
- * @param buf Client data frame content
- * @param size Size of data frame content
- * @param nread Will contain the length of bytes read
+ * @param frame Data frame
+ * @param size Data frame size
  * 
- * @returns the size of data frame left. -1 if there's an error
+ * @returns true is successful, else false
 */
-int handle_new_frame(Client *client, char buf[], int size, int *nread);
-
-/**
- * Checks for the validity of the rsv bits
- * 
- * @param client Connected client
- * @param byte_data Byte containing rsv bits.
- * 
- * @returns validity of rsv bits. False if not valid
-*/
-bool is_rsv_valid(Client *client, char byte_data);
+bool send_frame(Client *client, char *frame, uint64_t size);
 #endif

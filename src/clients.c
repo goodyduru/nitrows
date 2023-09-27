@@ -11,14 +11,13 @@ Client *init_client(int socketfd) {
     // We use calloc because we want to zero out the memory on initialization.
     node = (Node *)calloc(1, sizeof(Node));
 
-    // We need to allocate memory for the client including its buffer. 
-    // We can always increase the size of the buffer as data is received
-    client = (Client *)calloc(1, sizeof(Client) + BUFFER_SIZE);
+    // We need to allocate memory for the client.
+    client = (Client *)calloc(1, sizeof(Client));
 
     // Initialize the client with some of its members default values.
     client->socketfd = socketfd;
     client->status = CONNECTED;
-    client->buffer_max_size = BUFFER_SIZE;
+    client->buffer_max_size = 0;
     client->control_type = INVALID;
     client->data_type = INVALID;
     client->in_frame = false;
@@ -96,28 +95,10 @@ void delete_client(Client *client) {
 }
 
 void __free_client(Client *client) {
-    if ( client->control_extra_data != NULL )
-        free(client->control_extra_data);
-    free(client->buffer);
-    free(client);
-}
+    if ( client->control_data != NULL )
+        free(client->control_data);
 
-void reset_client(Client *client) {
-    client->is_final_frame = false;
-    client->is_control_frame = false;
-    client->in_frame = false;
-    client->header_size = 0;
-    client->payload_size = 0;
-    client->added_payload_size = 0;
-    client->control_type = INVALID;
-    client->control_data_size = 0;
-    if ( client->control_extra_data != NULL ) {
-        free(client->control_extra_data);
-    }
-    client->data_type = INVALID;
-    client->buffer_size = 0;
-    if ( client->buffer_max_size > BUFFER_SIZE ) {
-        realloc(client->buffer, BUFFER_SIZE);
-        client->buffer_max_size = BUFFER_SIZE;
-    }
+    if ( client->buffer != NULL )
+        free(client->buffer);
+    free(client);
 }

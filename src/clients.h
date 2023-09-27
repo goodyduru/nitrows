@@ -48,10 +48,6 @@ struct Client {
     // The size of the payload data in the currently processed frame.
     uint64_t payload_size;
 
-    // The amount of payload data added to the control/data buffer for a 
-    // currently processed frame.
-    uint64_t added_payload_size;
-
     // Frame mask for the currently processed frame.
     uint8_t mask_size;
     char mask[4];
@@ -59,31 +55,30 @@ struct Client {
     // Type of control frame being processed.
     Opcode control_type;
 
-    // This one is an optimization. Most control data will contain at most just 
-    // the status code which is 2 bytes. But, some will contain the reason. We 
-    // need to be able to handle these without wasting space. If the payload 
-    // size is less than/equal to 2, we store it in the control_data element. 
-    // Else, we allocate space for the control_extra_data element and store the 
-    // rest of the data there. The control_data_size element stores the length
-    // of the control data.
-    char control_data[2];
-    int control_data_size;
-    char *control_extra_data;
+    // We store incomplete control frame data here for use later
+    char *control_data;
+
+    // Size of control frame data buffer
+    uint8_t control_data_size;
 
     // Type of data frame being processed. This holds across multiple frames of 
     // fragmented data
     Opcode data_type;
 
-    // The payload of a data frame has to be stored somewhere. These last 3 
-    // elements handle everything concerning this. These values hold across 
-    // multiple frames of fragmented data. The buffer array contains the data 
-    // received so far. The buffer_size element determines the size of received 
-    // data in the buffer array. The buffer_max_size element determines the max 
-    // size of the buffer array. We can increase this size to a limit if it the 
-    // array size isn't upto the expected data size.
+    // Index of current data frame within `buffer`
+    uint64_t current_data_frame_start;
+
+    // The payload of an incomplete or fragrmented data frame has to be stored
+    // somewhere. These last 3 elements handle everything concerning this.
+    // These values hold across multiple frames of fragmented data. The buffer
+    // array contains the data received so far. The buffer_size element
+    // determines the size of received data in the buffer array. The
+    // buffer_max_size element determines the max size of the buffer array. We
+    // can increase this size to a limit if it the array size isn't upto the
+    // expected data size.
     uint64_t buffer_size;
     uint64_t buffer_max_size;
-    char buffer[];
+    char *buffer;
 };
 
 typedef struct Node Node;

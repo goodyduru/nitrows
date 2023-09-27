@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/param.h>
 #include <sys/socket.h>
 #include <openssl/sha.h>
 
@@ -11,6 +12,7 @@
 #include "defs.h"
 #include "events.h"
 #include "server.h"
+#include "utf8.h"
 
 void handle_connection(int socketfd) {
     Client* client = get_client(socketfd);
@@ -22,7 +24,7 @@ void handle_connection(int socketfd) {
     } else {
         // A client found in the table is more likely sending a frame. This 
         // calls the function that handles the frame request.
-        handle_frame(client);
+        handle_client_data(client);
     }
 }
 
@@ -371,8 +373,8 @@ void close_client(Client* client) {
     delete_client(client);
 }
 
-void handle_frame(Client* client) {
-    int nbytes, start, nread;
+void handle_client_data(Client* client) {
+    int nbytes, read, total_read;
     char buf[BUFFER_SIZE];
 
     nbytes = recv(client->socketfd, buf, BUFFER_SIZE, 0);
@@ -387,169 +389,48 @@ void handle_frame(Client* client) {
         close_client(client);
         return;
     }
-
-    start = 0;
-    nread = 0;
-    while ( nbytes > 0 ) {
-        // This deals with the condition of a new dataframe / or a batch of new 
-        // dataframe
-        while ( nbytes > 0 && client->data_type == INVALID &&
-                client->control_type == INVALID ) {
-            nbytes = handle_new_frame(client, buf+start, nbytes, &nread);
+    total_read = 0;
+    while ( total_read != nbytes ) {
+        // Mask key is the last info in the frame header and is stored in a
+        // character buffer. It's used as a proxy to determine if the frame's
+        // header data has been extracted. If the length of that buffer isn't
+        // 4, the frame header hasn't been completely extracted.
+        if ( client->mask_size != 4 ) {
+            read = extract_header_data(client, buf + total_read,
+                                        nbytes - total_read);
+            if ( read < 0 ) {
+                close_client(client);
+                return;
+            }
+        }
+        total_read += read;
+        // All data has been read.
+        if ( nbytes == total_read ) {
+            break;
         }
 
-        if ( nbytes < 0 ) {
+        if ( client->is_control_frame ) {
+            read = handle_control_frame(client, buf + total_read,
+                                        nbytes - total_read);
+        }
+        else {
+            read = handle_data_frame(client, buf + total_read,
+                                     nbytes - total_read);
+        }
+        if ( read < 0 ) {
             close_client(client);
             return;
         }
-
+        total_read += read;
         
     }
 }
 
-int handle_new_frame(Client* client, char buf[], int size, int *nread) {
-    uint64_t read = 0;
-    uint8_t is_final_frame = buf[0] >> 7;
-    bool valid_rsv = is_rsv_valid(client, buf[0]);
-
-    // If our rsvs are invalid, then send a close frame and -1
-    if ( valid_rsv == false ) {
-        send_close_frame(client, INVALID_EXTENSION);
-        return -1;
-    } 
-
-    uint8_t opcode = buf[0] & 15;
-    // Eliminate invalid opcode
-    if ( (opcode > BINARY && opcode < CLOSE) || (opcode > PONG) ) {
-        send_close_frame(client, INVALID_TYPE);
-        return -1;
+bool send_frame(Client *client, char *frame, uint64_t size) {
+    ssize_t bytes_sent, total_bytes_sent;
+    while ( (bytes_sent = send(client->socketfd, frame+total_bytes_sent, size - total_bytes_sent, 0)) > 0 ) {
+        total_bytes_sent += bytes_sent;
     }
 
-    // We need to set the client struct members that we can set.
-    client->is_final_frame = (bool) is_final_frame;
-    client->is_control_frame = (opcode > THRESHOLD);
-    if ( client->is_control_frame ) {
-        client->control_type = opcode;
-    }
-    else {
-        client->data_type = opcode;
-    }
-
-    client->in_frame = true;
-    // We are done if we only received one byte of data
-    if ( size == 1 ) {
-        return 0;
-    }
-    read = 1;
-
-    uint8_t has_mask = buf[1] >> 7;
-    // Reject lack of mask
-    if ( !has_mask ) {
-        reset_client(client);
-        send_close_frame(client, INVALID_TYPE);
-        return -1;
-    }
-
-    uint8_t payload_size = (buf[1] & 127);
-    uint8_t mask_offset = 0; // Start offset of mask in buffer
-    if ( payload_size < 126 ) {
-        client->payload_size = payload_size;
-        mask_offset = 2;
-        read += 1;
-    } else if ( payload_size == 126 && !client->is_control_frame ) {
-        // Payload is a short integer
-        uint16_t s;
-        if ( size >= 4 ) {
-            // There's enough data in the frame to determine payload size. At
-            // least, there are 2 more bytes to read.
-            memcpy(s, buf[2], 2);
-            client->payload_size = (uint64_t)ntohs(s);
-            mask_offset = 4;
-            read += 3;
-        }
-        else {
-            // There's not enough data in the frame to get payload size. We
-            // have to store this frame's header info in the current_header
-            // array.
-            client->header_size = size - 1;
-            s = 1;
-            while ( s < size ) {
-                client->current_header[s-1] = buf[s];
-                s++;
-            }
-            return 0;
-        }
-    } else if ( !client->is_control_frame ) {
-        // Payload is a long integer
-        uint64_t s;
-        if ( size >= 10 ) {
-            // There's enough data in the frame to determine payload size. At
-            // least, there's are 8 more bytes to read.
-            memcpy(s, buf[2], 8);
-            client->payload_size = ntohll(s);
-            mask_offset = 10;
-            read += 9;
-        }
-        else {
-            // There's not enough data in the frame to determine payload size.
-            // We have to store this frame's header info in the current_header
-            // array.
-            client->header_size = size - 1;
-            s = 1;
-            while ( s < size ) {
-                client->current_header[s-1] = buf[s];
-                s++;
-            }
-            return 0;
-        }
-    }
-    else {
-        // Client is a control frame and its payload is too large
-        reset_client(client);
-        send_close_frame(client, TOO_LARGE);
-        return -1;
-    }
-
-    // Check payload size is below our max size and return an error if it is
-    if ( client->payload_size > MAX_PAYLOAD_SIZE ) {
-        reset_client(client);
-        send_close_frame(client, TOO_LARGE);
-    }
-
-    // Check the existence of mask in request content
-    uint8_t s = 0;
-    if ( (size - mask_offset) > 4 ) {
-        // There's mask data
-        while ( s < 4 ) {
-            client->mask[s] = buf[mask_offset+s];
-            s++;
-        }
-        client->mask_size = 4;
-        read += 4;
-    }
-    else {
-        // Not enough mask data. Return after copy
-        client->mask_size = size - mask_offset;
-        while ( s < client->mask_size ) {
-            client->mask[s] = buf[mask_offset+s];
-            s++;
-        }
-        return 0;
-    }
-    // Deal with data/control frame with respective functions
-    if ( client->is_control_frame ) {
-        read += handle_control_frame(client, buf+read, size - read);
-    } else {
-        read += handle_data_frame(client, buf+read, size - read);
-    }
-    *nread = read;
-    return size - read;
-}
-
-bool is_rsv_valid(Client *client, char byte_data) {
-    uint8_t rsv1 = (byte_data & 64) >> 6;
-    uint8_t rsv2 = (byte_data & 32) >> 5;
-    uint8_t rsv3 = (byte_data & 16) >> 4;
-
-    return (rsv1 == 0 && rsv2 == 0 && rsv3 == 0);
+    return ( bytes_sent == 0 );
 }

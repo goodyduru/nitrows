@@ -12,7 +12,7 @@ int8_t extract_header_data(Client *client, char buf[], int size) {
     header_read = 0;
     // If we aren't in frame, extract fin, opcode and check rsvs
     if ( !client->in_frame ) { 
-        if ( !set_frame_type(client, buf[0]) ) {
+        if ( !get_frame_type(client, buf[0]) ) {
             return -1;
         }
         header_read += 1;
@@ -24,7 +24,7 @@ int8_t extract_header_data(Client *client, char buf[], int size) {
 
     // Extract payload size if we haven't
     if ( client->header_size == 0 || (client->payload_size <= 127 && client->current_header[0] != client->payload_size) ) {
-        read = set_payload_size(client, buf+header_read, size-header_read);
+        read = get_payload_data(client, buf+header_read, size-header_read);
         if ( read < 0 ) {
             return -1;
         }
@@ -40,7 +40,7 @@ int8_t extract_header_data(Client *client, char buf[], int size) {
     return header_read;
 }
 
-bool set_frame_type(Client *client, char byte) {
+bool get_frame_type(Client *client, char byte) {
     bool is_final_frame = ( byte > 127 );
     bool valid_rsv_bits = are_rsv_bits_valid(client, byte);
 
@@ -84,7 +84,7 @@ bool are_rsv_bits_valid(Client *client, char byte_data) {
     return (rsv1 == 0 && rsv2 == 0 && rsv3 == 0);
 }
 
-int8_t set_payload_data(Client *client, char buf[], int size) {
+int8_t get_payload_data(Client *client, char buf[], int size) {
     int8_t read = 0;
     if ( client->header_size == 0 ) {
         // Empty header size means we've not check the existence of mask.
@@ -139,7 +139,7 @@ int8_t set_payload_data(Client *client, char buf[], int size) {
         }
 
         uint16_t s;
-        memcpy(s, client->current_header+1, 2);
+        memcpy(&s, client->current_header+1, 2);
         client->payload_size = (uint64_t)ntohs(s);
     } else if ( payload_length == 127 && !client->is_control_frame ) {
         // Payload length is a long integer
@@ -154,7 +154,7 @@ int8_t set_payload_data(Client *client, char buf[], int size) {
             return read;
         }
         uint64_t s;
-        memcpy(s, client->current_header+1, 8);
+        memcpy(&s, client->current_header+1, 8);
         client->payload_size = ntohll(s);
     }
     else {
@@ -192,7 +192,7 @@ int8_t handle_control_frame(Client *client, char buf[], int size) {
         data = buf;
         read += client->payload_size;
     } 
-    else if ( client->control_data_size < client->payload_size  ) {
+    else {
         if ( client->control_data == NULL ) {
             client->control_data = (char *)malloc(client->payload_size);
         }
@@ -220,7 +220,7 @@ int8_t handle_control_frame(Client *client, char buf[], int size) {
     if ( client->control_type == CLOSE ) {
         if ( client->payload_size > 0 ) {
             uint16_t status_code;
-            memcpy(status_code, data, 2);
+            memcpy(&status_code, data, 2);
             status_code = ntohs(status_code);
             printf("Received close frame with status %d\n", status_code);
         }
@@ -349,36 +349,40 @@ int64_t handle_data_frame(Client *client, char buf[], int size) {
 
 void send_close_status(Client *client, Status_code code) {
     char statuses[2];
-    memcpy(statuses, htons(code), 2);
+    uint16_t c = htons(code);
+    memcpy(statuses, &c, 2);
     send_close_frame(client, statuses, 2);
 }
 
 void send_close_frame(Client *client, char *message, uint8_t size) {
-    char frame[size + 2], first_byte, payload_size;
+    char frame[size + 2], payload_size;
+    unsigned char first_byte;
     first_byte = 128;
     first_byte |= CLOSE;
     payload_size = 0;
     payload_size |= (127 & size);
-    memcpy(frame, first_byte, 1);
-    memcpy(frame+1, payload_size, 1);
+    memcpy(frame, &first_byte, 1);
+    memcpy(frame+1, &payload_size, 1);
     memcpy(frame+2, message, size);
     send_frame(client, frame, size+2);
 }
 
 bool send_pong_frame(Client *client, char *message, uint8_t size) {
-    char frame[size + 2], first_byte, payload_size;
+    char frame[size + 2], payload_size;
+    unsigned char first_byte;
     first_byte = 128;
     first_byte |= PONG;
     payload_size = 0;
     payload_size |= (127 & size);
-    memcpy(frame, first_byte, 1);
-    memcpy(frame+1, payload_size, 1);
+    memcpy(frame, &first_byte, 1);
+    memcpy(frame+1, &payload_size, 1);
     memcpy(frame+2, message, size);
     return send_frame(client, frame, size+2);
 }
 
 bool send_ping_frame(Client *client, char *message, uint8_t size) {
-    char frame[size + 2], first_byte, payload_size;
+    char frame[size + 2], payload_size;
+    unsigned char first_byte;
     first_byte = 128;
     first_byte |= PING;
     payload_size = 0;
@@ -391,7 +395,8 @@ bool send_ping_frame(Client *client, char *message, uint8_t size) {
 
 bool send_data_frame(Client *client, char *message, uint64_t size,
                     bool is_text) {
-    char first_byte, payload_size, size_length, *frame;
+    char payload_size, size_length, *frame;
+    unsigned char first_byte;
     first_byte = 128;
     first_byte |= ( is_text ? TEXT : BINARY );
     payload_size = 0;
@@ -410,9 +415,11 @@ bool send_data_frame(Client *client, char *message, uint64_t size,
     frame[0] = first_byte;
     frame[1] = payload_size;
     if ( size_length == 2 ) {
-        memcpy(frame+2, htons(size), 2);
+        uint16_t c = htons(size);
+        memcpy(frame+2, &c, 2);
     } else if ( size_length == 8 )  {
-        memcpy(frame+2, htonll(size), 8);
+        uint64_t c = htonll(size);
+        memcpy(frame+2, &c, 8);
     }
     memcpy(frame+size_length, message, size);
     return send_frame(client, frame, size+size_length+2);

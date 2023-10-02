@@ -56,6 +56,6 @@ void delete_from_event_loop(int socketfd, int index);
  * @param handle_others function that runs if it's other sockets.
 */
 void run_event_loop(int listener, void (*handle_listener)(int), 
-                    void (*handle_others(int)));
+                    void (*handle_others)(int));
 
 #endif

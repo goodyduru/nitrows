@@ -6,13 +6,13 @@
 #include <unistd.h>
 #include <sys/param.h>
 #include <sys/socket.h>
-#include <openssl/sha.h>
 
 #include "base64.h"
 #include "defs.h"
 #include "events.h"
+#include "frame.h"
 #include "server.h"
-#include "utf8.h"
+#include "sha1.h"
 
 void handle_connection(int socketfd) {
     Client* client = get_client(socketfd);
@@ -46,9 +46,9 @@ void send_error_response(int socketfd, int status_code, char message[]) {
     char status_405[] = "Method Not Allowed";
     char status_400[] = "Bad Request";
     if ( status_code == 405 ) {
-        length = sprintf(response, "HTTP/1.1 %d %s\r\nConnection: close\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n%s", status_code, status_405, strlen(message), message);
+        length = sprintf(response, "HTTP/1.1 %d %s\r\nConnection: close\r\nContent-Type: text/html\r\nContent-Length: %lu\r\n\r\n%s", status_code, status_405, strlen(message), message);
     } else {
-        length = sprintf(response, "HTTP/1.1 %d %s\r\nConnection: close\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n%s", status_code, status_400, strlen(message), message);
+        length = sprintf(response, "HTTP/1.1 %d %s\r\nConnection: close\r\nContent-Type: text/html\r\nContent-Length: %lu\r\n\r\n%s", status_code, status_400, strlen(message), message);
     }
     int sent = send(socketfd, response, length, 0);
     if ( sent == -1 ) {
@@ -201,7 +201,7 @@ bool is_version_header_valid(int socketfd, char buf[]) {
  */
 bool get_subprotocols(int socketfd, char buf[], char subprotocol[],
                                 int *subprotocol_len) {
-    char *p, c;
+    char *p;
     // Confirm the presence of header
     if ( (p = strcasestr(buf, "Sec-Websocket-Protocol:")) == NULL ) {
         return true;
@@ -220,7 +220,7 @@ bool get_subprotocols(int socketfd, char buf[], char subprotocol[],
     }
     int i = 0;
     while ( i < 31 && *p != '\0' && *p != ',' ) {
-        subprotocol[i] = c;
+        subprotocol[i] = *p;
         i++;
         p++;
     }
@@ -246,7 +246,7 @@ bool get_subprotocols(int socketfd, char buf[], char subprotocol[],
  */
 bool get_extensions(int socketfd, char buf[], char extension[],
                                 int *extension_len) {
-    char *p, c;
+    char *p;
     // Confirm the presence of header
     if ( (p = strcasestr(buf, "Sec-Websocket-Extensions:")) == NULL ) {
         return true;
@@ -263,7 +263,7 @@ bool get_extensions(int socketfd, char buf[], char extension[],
     }
     int i = 0;
     while ( i < 31 && *p != '\0' && *p != ',' ) {
-        extension[i] = c;
+        extension[i] = *p;
         i++;
         p++;
     }
@@ -341,11 +341,13 @@ bool __send_upgrade_response(int socketfd, char key[], char subprotocol[],
                             int subprotocol_len, char extension[],
                             int extension_len) {
     int length;
-    unsigned char sha1[20], base64[29], response[256];
+    char response[256];
+    unsigned char base64[29];
+    char sha1[20];
     // Create `Sec-WebSocket-Accept` value
     strncpy(key+24, GUID, 36);
-    SHA1(key, 60, sha1);
-    base64_encode(sha1, base64, 20);
+    SHA1(sha1, key, 60);
+    base64_encode((unsigned char *) sha1, base64, 20);
     base64[28] = '\0';
 
     // Format response based on the presence of subprotocols and extensions
@@ -428,6 +430,7 @@ void handle_client_data(Client* client) {
 
 bool send_frame(Client *client, char *frame, uint64_t size) {
     ssize_t bytes_sent, total_bytes_sent;
+    total_bytes_sent = 0;
     while ( (bytes_sent = send(client->socketfd, frame+total_bytes_sent, size - total_bytes_sent, 0)) > 0 ) {
         total_bytes_sent += bytes_sent;
     }

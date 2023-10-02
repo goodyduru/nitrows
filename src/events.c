@@ -54,7 +54,7 @@ void delete_from_event_loop(int socketfd, int index) {
 }
 
 void run_event_loop(int listener, void (*handle_listener)(int),
-                    void (*handle_others(int))) {
+                    void (*handle_others)(int)) {
     while(1) {
         int poll_count = poll(event.objects, event.count, -1);
         if ( poll_count == -1 ) {

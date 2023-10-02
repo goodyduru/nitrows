@@ -18,14 +18,14 @@
 int8_t extract_header_data(Client *client, char buf[], int size);
 
 /**
- * Set the type of current frame in client struct.
+ * Get the current frame type and set in client struct.
  * 
  * @param client Connected client
  * @param byte Byte containing FIN, RSVS and OPCODE data
  * 
  * @returns successful set up.
 */
-bool set_frame_type(Client *client, char byte);
+bool get_frame_type(Client *client, char byte);
 
 /**
  * Checks for the validity of the rsv bits
@@ -38,7 +38,7 @@ bool set_frame_type(Client *client, char byte);
 bool are_rsv_bits_valid(Client *client, char byte_data);
 
 /**
- * Set the payload size info in client struct.
+ * Get the payload size info and set it in client struct.
  * 
  * @param client Connected client
  * @param buf Unprocessed data
@@ -46,7 +46,7 @@ bool are_rsv_bits_valid(Client *client, char byte_data);
  * 
  * @returns amount of bytes read
 */
-int8_t set_payload_data(Client *client, char buf[], int size);
+int8_t get_payload_data(Client *client, char buf[], int size);
 
 /**
  * Handles the various types of control frames

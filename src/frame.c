@@ -1,12 +1,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "frame.h"
 #include "utf8.h"
 #include "server.h"
 
-int8_t extract_header_data(Client *client, char buf[], int size) {
+int8_t extract_header_data(Client *client, unsigned char buf[], int size) {
     int8_t header_read, read;
     read = 0;
     header_read = 0;
@@ -40,7 +41,7 @@ int8_t extract_header_data(Client *client, char buf[], int size) {
     return header_read;
 }
 
-bool get_frame_type(Client *client, char byte) {
+bool get_frame_type(Client *client, unsigned char byte) {
     bool is_final_frame = ( byte > 127 );
     bool valid_rsv_bits = are_rsv_bits_valid(client, byte);
 
@@ -76,7 +77,7 @@ bool get_frame_type(Client *client, char byte) {
     return true;
 }
 
-bool are_rsv_bits_valid(Client *client, char byte_data) {
+bool are_rsv_bits_valid(Client *client, unsigned char byte_data) {
     uint8_t rsv1 = (byte_data & 64) >> 6;
     uint8_t rsv2 = (byte_data & 32) >> 5;
     uint8_t rsv3 = (byte_data & 16) >> 4;
@@ -84,7 +85,7 @@ bool are_rsv_bits_valid(Client *client, char byte_data) {
     return (rsv1 == 0 && rsv2 == 0 && rsv3 == 0);
 }
 
-int8_t get_payload_data(Client *client, char buf[], int size) {
+int8_t get_payload_data(Client *client, unsigned char buf[], int size) {
     int8_t read = 0;
     if ( client->header_size == 0 ) {
         // Empty header size means we've not check the existence of mask.
@@ -174,15 +175,15 @@ int8_t get_payload_data(Client *client, char buf[], int size) {
 /**
  * Unmask data gotten from client with mask key.
  */
-void unmask(Client *client, char buf[], int size) {
+void unmask(Client *client, unsigned char buf[], int size) {
     for ( int i = 0; i < size; i++ ) {
-        buf[i] = buf[i] ^ client->mask[i%4];
+        buf[i] ^= client->mask[i%4];
     }
 }
 
-int8_t handle_control_frame(Client *client, char buf[], int size) {
+int8_t handle_control_frame(Client *client, unsigned char buf[], int size) {
     int8_t read = 0;
-    char *data;
+    unsigned char *data;
 
     // Avoid unnecessary copies and allocations. We can use the buf directly.
     // If size of buffer is less than payload size, the data needs to be copied
@@ -194,7 +195,7 @@ int8_t handle_control_frame(Client *client, char buf[], int size) {
     } 
     else {
         if ( client->control_data == NULL ) {
-            client->control_data = (char *)malloc(client->payload_size);
+            client->control_data = (unsigned char *)malloc(client->payload_size);
         }
         data = client->control_data;
         uint8_t to_copy_size = client->payload_size - client->control_data_size;
@@ -246,10 +247,10 @@ int8_t handle_control_frame(Client *client, char buf[], int size) {
     return read;
 }
 
-int64_t handle_data_frame(Client *client, char buf[], int size) {
+int64_t handle_data_frame(Client *client, unsigned char buf[], int size) {
     int64_t read = 0;
     uint64_t total_size;
-    char *data;
+    unsigned char *data;
 
     // Avoid unnecessary copies and allocations. We can use the buf directly.
     // If size of buffer is less than payload size, the data needs to be copied
@@ -266,7 +267,8 @@ int64_t handle_data_frame(Client *client, char buf[], int size) {
 
         // Allocate or increase size if we don't have enough space
         if ( client->buffer == NULL ) {
-            client->buffer = (char *)malloc(client->payload_size);
+            client->buffer = (unsigned char *)malloc(client->payload_size);
+            client->buffer_max_size = client->payload_size;
         } else if ( client->buffer_size == client->buffer_max_size
                     && client->payload_size > 0 ) {
             client->buffer_max_size += client->payload_size;
@@ -274,7 +276,7 @@ int64_t handle_data_frame(Client *client, char buf[], int size) {
                 send_close_status(client, TOO_LARGE);
                 return -1;
             }
-            client->buffer = (char *)realloc(client->buffer, client->buffer_max_size);
+            client->buffer = (unsigned char *)realloc(client->buffer, client->buffer_max_size);
         }
 
         data = client->buffer;
@@ -314,13 +316,13 @@ int64_t handle_data_frame(Client *client, char buf[], int size) {
 
     if ( client->is_final_frame ) {
         if (client->data_type == TEXT ) {
-            bool is_valid = validate_utf8(data, total_size);
+            bool is_valid = validate_utf8((char *)data, total_size);
             if ( !is_valid ) {
                 send_close_status(client, INVALID_ENCODING);
                 return -1;
             }
         }
-        bool is_sent = send_data_frame(client, "Hello", 5, true);
+        bool is_sent = send_data_frame(client, data, total_size, true);
         if ( !is_sent ) return -1;
     }
     else {
@@ -348,14 +350,14 @@ int64_t handle_data_frame(Client *client, char buf[], int size) {
 }
 
 void send_close_status(Client *client, Status_code code) {
-    char statuses[2];
+    unsigned char statuses[2];
     uint16_t c = htons(code);
     memcpy(statuses, &c, 2);
     send_close_frame(client, statuses, 2);
 }
 
-void send_close_frame(Client *client, char *message, uint8_t size) {
-    char frame[size + 2], payload_size;
+void send_close_frame(Client *client, unsigned char *message, uint8_t size) {
+    unsigned char frame[size + 2], payload_size;
     unsigned char first_byte;
     first_byte = 128;
     first_byte |= CLOSE;
@@ -367,8 +369,8 @@ void send_close_frame(Client *client, char *message, uint8_t size) {
     send_frame(client, frame, size+2);
 }
 
-bool send_pong_frame(Client *client, char *message, uint8_t size) {
-    char frame[size + 2], payload_size;
+bool send_pong_frame(Client *client, unsigned char *message, uint8_t size) {
+    unsigned char frame[size + 2], payload_size;
     unsigned char first_byte;
     first_byte = 128;
     first_byte |= PONG;
@@ -380,8 +382,8 @@ bool send_pong_frame(Client *client, char *message, uint8_t size) {
     return send_frame(client, frame, size+2);
 }
 
-bool send_ping_frame(Client *client, char *message, uint8_t size) {
-    char frame[size + 2], payload_size;
+bool send_ping_frame(Client *client, unsigned char *message, uint8_t size) {
+    unsigned char frame[size + 2], payload_size;
     unsigned char first_byte;
     first_byte = 128;
     first_byte |= PING;
@@ -393,9 +395,9 @@ bool send_ping_frame(Client *client, char *message, uint8_t size) {
     return send_frame(client, frame, size+2);
 }
 
-bool send_data_frame(Client *client, char *message, uint64_t size,
+bool send_data_frame(Client *client, unsigned char *message, uint64_t size,
                     bool is_text) {
-    char payload_size, size_length, *frame;
+    unsigned char payload_size, size_length, *frame;
     unsigned char first_byte;
     first_byte = 128;
     first_byte |= ( is_text ? TEXT : BINARY );
@@ -411,7 +413,7 @@ bool send_data_frame(Client *client, char *message, uint64_t size,
         payload_size |= 127;
         size_length = 8;
     }
-    frame = (char *) malloc(2 + size_length + size);
+    frame = (unsigned char *) malloc(2 + size_length + size);
     frame[0] = first_byte;
     frame[1] = payload_size;
     if ( size_length == 2 ) {
@@ -421,6 +423,6 @@ bool send_data_frame(Client *client, char *message, uint64_t size,
         uint64_t c = htonll(size);
         memcpy(frame+2, &c, 8);
     }
-    memcpy(frame+size_length, message, size);
+    memcpy(frame+size_length+2, message, size);
     return send_frame(client, frame, size+size_length+2);
 }

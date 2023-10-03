@@ -68,5 +68,5 @@ void handle_client_data(Client* client);
  * 
  * @returns true is successful, else false
 */
-bool send_frame(Client *client, char *frame, uint64_t size);
+bool send_frame(Client *client, unsigned char *frame, uint64_t size);
 #endif

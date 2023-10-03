@@ -219,7 +219,7 @@ bool get_subprotocols(int socketfd, char buf[], char subprotocol[],
         return false;
     }
     int i = 0;
-    while ( i < 31 && *p != '\0' && *p != ',' ) {
+    while ( i < 99 && *p != '\0' && *p != ','  && *p != '\r' && *p != '\n') {
         subprotocol[i] = *p;
         i++;
         p++;
@@ -262,7 +262,7 @@ bool get_extensions(int socketfd, char buf[], char extension[],
         return false;
     }
     int i = 0;
-    while ( i < 31 && *p != '\0' && *p != ',' ) {
+    while ( i < 99 && *p != '\0' && *p != ','  && *p != '\r' && *p != '\n' ) {
         extension[i] = *p;
         i++;
         p++;
@@ -277,11 +277,13 @@ void handle_upgrade(int socketfd) {
     char *p;
     char buf[BUFFER_SIZE]; // Buffer that holds request
     char key[60]; // Buffer that holds sec-websocket-accept value
-    char subprotocol[32];
-    char extension[32];
+    char subprotocol[100];
+    char extension[100];
     int subprotocol_len, extension_len;
     bool is_valid;
     nbytes = recv(socketfd, buf, BUFFER_SIZE, 0);
+    subprotocol_len = 0;
+    extension_len = 0;
 
     // Close connection if there's an error or client closes connection.
     if ( nbytes <= 0 ) {
@@ -341,7 +343,7 @@ bool __send_upgrade_response(int socketfd, char key[], char subprotocol[],
                             int subprotocol_len, char extension[],
                             int extension_len) {
     int length;
-    char response[256];
+    char response[512];
     unsigned char base64[29];
     char sha1[20];
     // Create `Sec-WebSocket-Accept` value
@@ -350,17 +352,14 @@ bool __send_upgrade_response(int socketfd, char key[], char subprotocol[],
     base64_encode((unsigned char *) sha1, base64, 20);
     base64[28] = '\0';
 
-    // Format response based on the presence of subprotocols and extensions
-    if ( subprotocol_len > 0 && extension_len > 0 ) {
-        length = sprintf(response, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\nSec-WebSocket-Protocol: %s\r\nSec-WebSocket-Extensions: %s\r\n", base64, subprotocol, extension);
-    } else if ( subprotocol_len > 0 ) {
-        length = sprintf(response, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\nSec-WebSocket-Protocol: %s\r\n", base64, subprotocol);
-    } else if ( extension_len > 0 ) {
-        length = sprintf(response, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\nSec-WebSocket-Extensions: %s\r\n", base64, extension);
-    } 
-    else {
-        length = sprintf(response, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\n", base64);
+    // Format response based on the presence of subprotocols
+    if ( subprotocol_len > 0 ) {
+        length = sprintf(response, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\nSec-WebSocket-Protocol: %s\r\n\r\n", base64, subprotocol);
     }
+    else {
+        length = sprintf(response, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\n\r\n", base64);
+    }
+    response[length] = '\0';
     int sent = send(socketfd, response, length, 0);
     if ( sent == -1 ) {
         perror("send");
@@ -377,7 +376,7 @@ void close_client(Client* client) {
 
 void handle_client_data(Client* client) {
     int nbytes, read, total_read;
-    char buf[BUFFER_SIZE];
+    unsigned char buf[BUFFER_SIZE];
 
     nbytes = recv(client->socketfd, buf, BUFFER_SIZE, 0);
     // Close connection if there's an error or client closes connection.
@@ -428,7 +427,7 @@ void handle_client_data(Client* client) {
     }
 }
 
-bool send_frame(Client *client, char *frame, uint64_t size) {
+bool send_frame(Client *client, unsigned char *frame, uint64_t size) {
     ssize_t bytes_sent, total_bytes_sent;
     total_bytes_sent = 0;
     while ( (bytes_sent = send(client->socketfd, frame+total_bytes_sent, size - total_bytes_sent, 0)) > 0 ) {

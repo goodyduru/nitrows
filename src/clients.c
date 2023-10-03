@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "./clients.h"
@@ -101,4 +102,22 @@ void __free_client(Client *client) {
     if ( client->buffer != NULL )
         free(client->buffer);
     free(client);
+}
+
+void print_client(Client *client) {
+    printf("Client info\n");
+    printf("Socket: %d\n", client->socketfd);
+    printf("Status: %d\n", client->status);
+    printf("In final frame: %d\n", client->is_final_frame);
+    printf("Is control frame: %d\n", client->is_control_frame);
+    printf("Processing frame: %d\n", client->in_frame);
+    printf("Header size: %d\n", client->header_size);
+    printf("Payload size: %llu\n", client->payload_size);
+    printf("Mask size: %d\n", client->mask_size);
+    printf("Control type: %d\n", client->control_type);
+    printf("Control data: %s\n", client->control_data);
+    printf("Control data size: %d\n", client->control_data_size);
+    printf("Current data frame start: %llu\n", client->current_data_frame_start);
+    printf("Buffer size: %llu\n", client->buffer_size);
+    printf("Buffer max size: %llu\n", client->buffer_max_size);
 }

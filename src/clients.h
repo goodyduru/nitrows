@@ -43,20 +43,20 @@ struct Client {
     // a buffer is less than this number, we store it in the `current_header` 
     // element and record the size in the `header_size` element.
     uint8_t header_size;
-    char current_header[9];
+    unsigned char current_header[9];
 
     // The size of the payload data in the currently processed frame.
     uint64_t payload_size;
 
     // Frame mask for the currently processed frame.
     uint8_t mask_size;
-    char mask[4];
+    unsigned char mask[4];
 
     // Type of control frame being processed.
     Opcode control_type;
 
     // We store incomplete control frame data here for use later
-    char *control_data;
+    unsigned char *control_data;
 
     // Size of control frame data buffer
     uint8_t control_data_size;
@@ -78,7 +78,7 @@ struct Client {
     // expected data size.
     uint64_t buffer_size;
     uint64_t buffer_max_size;
-    char *buffer;
+    unsigned char *buffer;
 };
 
 typedef struct Node Node;
@@ -134,5 +134,8 @@ void __free_client(Client *client);
  * @param client Pointer to client struct
 */
 void reset_client(Client *client);
+
+// For debugging purposes
+void print_client(Client *client);
 
 #endif // Included clients.h

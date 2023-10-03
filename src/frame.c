@@ -242,6 +242,7 @@ int8_t handle_control_frame(Client *client, unsigned char buf[], int size) {
     client->control_type = INVALID;
     if ( client->control_data_size > 0 ) {
         free(client->control_data);
+        client->control_data = NULL;
         client->control_data_size = 0;
     }
     return read;
@@ -267,15 +268,17 @@ int64_t handle_data_frame(Client *client, unsigned char buf[], int size) {
 
         // Allocate or increase size if we don't have enough space
         if ( client->buffer == NULL ) {
-            client->buffer = (unsigned char *)malloc(client->payload_size);
-            client->buffer_max_size = client->payload_size;
-        } else if ( client->buffer_size == client->buffer_max_size
-                    && client->payload_size > 0 ) {
-            client->buffer_max_size += client->payload_size;
-            if ( client->buffer_max_size > MAX_PAYLOAD_SIZE ) {
+            client->buffer = (unsigned char *)malloc(BUFFER_SIZE);
+            client->buffer_max_size = BUFFER_SIZE;
+        } else if ( (client->buffer_max_size - client->buffer_size) <           
+                    client->payload_size ) {
+            uint64_t remaining_space = client->payload_size - client->buffer_max_size - client->buffer_size;
+            remaining_space = (remaining_space + BUFFER_SIZE - 1) & ~(BUFFER_SIZE - 1); // Round to a multiple of buffer size
+            if ( (client->buffer_max_size + remaining_space) > MAX_PAYLOAD_SIZE ) {
                 send_close_status(client, TOO_LARGE);
                 return -1;
             }
+            client->buffer_max_size += remaining_space;
             client->buffer = (unsigned char *)realloc(client->buffer, client->buffer_max_size);
         }
 
@@ -294,23 +297,17 @@ int64_t handle_data_frame(Client *client, unsigned char buf[], int size) {
         }
         total_size = client->buffer_size;
     }
-
-    if ( data != buf ) {
-        uint64_t current_frame_size = client->buffer_size - client->current_data_frame_start;
-        if ( client->payload_size <= current_frame_size ) {
-            client->current_data_frame_start = client->buffer_size;
-        }
-    }
+    uint64_t current_frame_size = client->buffer_size - client->current_data_frame_start;
 
     // Unmask data with current mask data if end of the current frame payload
     // has been reached.
-    if ( data == buf || (client->buffer_size == client->buffer_max_size) ) {
+    if ( data == buf || current_frame_size == client->payload_size ) {
         unmask(client, data+client->current_data_frame_start,
                client->payload_size);
     }
 
     // Incomplete data, return
-    if ( data != buf && client->buffer_size < client->buffer_max_size ) {
+    if ( data != buf && current_frame_size < client->payload_size ) {
         return read;
     }
 
@@ -332,6 +329,7 @@ int64_t handle_data_frame(Client *client, unsigned char buf[], int size) {
         client->payload_size = 0;
         client->mask_size = 0;
         client->is_control_frame = false;
+        client->current_data_frame_start = client->buffer_size;
         return read;
     }
 
@@ -343,8 +341,10 @@ int64_t handle_data_frame(Client *client, unsigned char buf[], int size) {
     client->is_control_frame = false;
     if ( client->buffer != NULL ) {
         free(client->buffer);
+        client->current_data_frame_start = 0;
         client->buffer_max_size = 0;
         client->buffer_size = 0;
+        client->buffer = NULL;
     }
     return read;
 }

@@ -392,6 +392,7 @@ void handle_client_data(Client* client) {
     }
     total_read = 0;
     while ( total_read != nbytes ) {
+        read = 0;
         // Mask key is the last info in the frame header and is stored in a
         // character buffer. It's used as a proxy to determine if the frame's
         // header data has been extracted. If the length of that buffer isn't

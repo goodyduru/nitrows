@@ -114,6 +114,7 @@ void print_client(Client *client) {
     printf("Header size: %d\n", client->header_size);
     printf("Payload size: %llu\n", client->payload_size);
     printf("Mask size: %d\n", client->mask_size);
+    printf("Mask: %x%x%x%x\n", client->mask[0], client->mask[1], client->mask[2], client->mask[3]);
     printf("Control type: %d\n", client->control_type);
     printf("Control data: %s\n", client->control_data);
     printf("Control data size: %d\n", client->control_data_size);

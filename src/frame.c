@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -160,7 +161,7 @@ int8_t get_payload_data(Client *client, unsigned char buf[], int size) {
     }
     else {
         // Client is a control frame and its payload is too large
-        send_close_status(client, TOO_LARGE);
+        send_close_status(client, PROTOCOL_ERROR);
         return -1;
     }
 
@@ -224,6 +225,10 @@ int8_t handle_control_frame(Client *client, unsigned char buf[], int size) {
             memcpy(&status_code, data, 2);
             status_code = ntohs(status_code);
             printf("Received close frame with status %d\n", status_code);
+            if ( status_code == AWAY ) {
+                status_code = htons(1000);
+                memcpy(data, &status_code, 2);
+            }
         }
         send_close_frame(client, data, client->payload_size);
         return -1;
@@ -249,6 +254,7 @@ int8_t handle_control_frame(Client *client, unsigned char buf[], int size) {
 }
 
 int64_t handle_data_frame(Client *client, unsigned char buf[], int size) {
+    assert(client->buffer_size <= client->buffer_max_size);
     int64_t read = 0;
     uint64_t total_size;
     unsigned char *data;
@@ -270,9 +276,9 @@ int64_t handle_data_frame(Client *client, unsigned char buf[], int size) {
         if ( client->buffer == NULL ) {
             client->buffer = (unsigned char *)malloc(BUFFER_SIZE);
             client->buffer_max_size = BUFFER_SIZE;
-        } else if ( (client->buffer_max_size - client->buffer_size) <           
+        } else if ( (client->buffer_max_size - client->current_data_frame_start) <           
                     client->payload_size ) {
-            uint64_t remaining_space = client->payload_size - client->buffer_max_size - client->buffer_size;
+            uint64_t remaining_space = client->payload_size - client->buffer_max_size - client->current_data_frame_start;
             remaining_space = (remaining_space + BUFFER_SIZE - 1) & ~(BUFFER_SIZE - 1); // Round to a multiple of buffer size
             if ( (client->buffer_max_size + remaining_space) > MAX_PAYLOAD_SIZE ) {
                 send_close_status(client, TOO_LARGE);
@@ -312,14 +318,15 @@ int64_t handle_data_frame(Client *client, unsigned char buf[], int size) {
     }
 
     if ( client->is_final_frame ) {
-        if (client->data_type == TEXT ) {
+        bool is_text = (client->data_type == TEXT);
+        if ( is_text ) {
             bool is_valid = validate_utf8((char *)data, total_size);
             if ( !is_valid ) {
                 send_close_status(client, INVALID_ENCODING);
                 return -1;
             }
         }
-        bool is_sent = send_data_frame(client, data, total_size, true);
+        bool is_sent = send_data_frame(client, data, total_size, is_text);
         if ( !is_sent ) return -1;
     }
     else {

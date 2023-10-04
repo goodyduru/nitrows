@@ -407,7 +407,7 @@ void handle_client_data(Client* client) {
         }
         total_read += read;
         // All data has been read.
-        if ( nbytes == total_read ) {
+        if ( nbytes == total_read && client->payload_size > 0 ) {
             break;
         }
 

@@ -190,6 +190,37 @@ void unmask(Client *client, unsigned char buf[], int size) {
     }
 }
 
+void handle_close_frame(Client *client, unsigned char *data) {
+    if ( client->payload_size == 0 ) {
+        send_close_status(client, NORMAL);
+        return;
+    } else if ( client->payload_size == 1 ) {
+        send_close_status(client, PROTOCOL_ERROR);
+        return;
+    }
+    else {
+        uint16_t status_code;
+        memcpy(&status_code, data, 2);
+        status_code = ntohs(status_code);
+        printf("Received close frame with status %d\n", status_code);
+        int16_t new_status_code = get_reply_code(status_code);
+        if ( new_status_code == -1 ) {
+            send_close_status(client, 0);
+            return;
+        } else if ( new_status_code > 0 ) {
+            memcpy(data, &new_status_code, 2);
+        }
+
+        // Validate utf-8
+        bool is_valid = validate_utf8((char *)data+2, client->payload_size-2);
+        if ( !is_valid ) {
+            send_close_status(client, INVALID_ENCODING);
+            return;
+        }
+    }
+    send_close_frame(client, data, client->payload_size);
+}
+
 int8_t handle_control_frame(Client *client, unsigned char buf[], int size) {
     int8_t read = 0;
     unsigned char *data;
@@ -228,17 +259,7 @@ int8_t handle_control_frame(Client *client, unsigned char buf[], int size) {
 
     unmask(client, data, client->payload_size);
     if ( client->control_type == CLOSE ) {
-        if ( client->payload_size > 0 ) {
-            uint16_t status_code;
-            memcpy(&status_code, data, 2);
-            status_code = ntohs(status_code);
-            printf("Received close frame with status %d\n", status_code);
-            if ( status_code == AWAY ) {
-                status_code = htons(1000);
-                memcpy(data, &status_code, 2);
-            }
-        }
-        send_close_frame(client, data, client->payload_size);
+        handle_close_frame(client, data);
         return -1;
     } else if ( client->control_type == PING ) {
         bool is_sent = send_pong_frame(client, data, client->payload_size);
@@ -365,11 +386,40 @@ int64_t handle_data_frame(Client *client, unsigned char buf[], int size) {
     return read;
 }
 
+int16_t get_reply_code(uint16_t status_code) {
+    int16_t reply = 0;
+    /**
+     * We return normal if code is away, for defined and valid codes, we return
+     * 0 to avoid unnecessary copies. For others, we return -1 to send an empty
+     * close frame.
+    */
+    switch ( status_code ) {
+        case AWAY: 
+            reply = NORMAL;
+            break;
+        case NORMAL:
+        case PROTOCOL_ERROR:
+        case INVALID_TYPE:
+        case INVALID_ENCODING:
+        case VIOLATION:
+        case TOO_LARGE:
+        case INVALID_EXTENSION:
+        case UNEXPECTED_CONDITION:
+            reply = 0;
+            break;
+        default:
+            reply = -1;
+    }
+    return -1;
+}
+
 void send_close_status(Client *client, Status_code code) {
     unsigned char statuses[2];
-    uint16_t c = htons(code);
-    memcpy(statuses, &c, 2);
-    send_close_frame(client, statuses, 2);
+    if ( code > EMPTY_FRAME ) {
+        uint16_t c = htons(code);
+        memcpy(statuses, &c, 2);
+    }
+    send_close_frame(client, statuses, (code == EMPTY_FRAME) ? 0 : 2);
 }
 
 void send_close_frame(Client *client, unsigned char *message, uint8_t size) {

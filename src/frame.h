@@ -71,7 +71,16 @@ int8_t handle_control_frame(Client *client, unsigned char buf[], int size);
 int64_t handle_data_frame(Client *client, unsigned char buf[], int size);
 
 /**
- * Send close frame containing only status code
+ * Generates a reply code based on the status code.
+ * 
+ * @param status_code Code in close frame
+ * 
+ * @returns status code
+*/
+int16_t get_reply_code(uint16_t status_code);
+
+/**
+ * Send either empty close frame depending on status code
  * 
  * @param client Connected client
  * @param code Close status code

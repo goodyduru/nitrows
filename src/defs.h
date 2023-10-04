@@ -58,6 +58,7 @@ enum Opcode {
 typedef enum Status_code Status_code;
 // This defines the allowed status code used in a websocket close frame.
 enum Status_code {
+    EMPTY_FRAME = 0,
     NORMAL = 1000,
     AWAY = 1001,
     PROTOCOL_ERROR = 1002,

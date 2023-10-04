@@ -406,9 +406,13 @@ void handle_client_data(Client* client) {
             }
         }
         total_read += read;
-        // All data has been read.
-        if ( nbytes == total_read && client->payload_size > 0 ) {
-            break;
+        // Some frames have an empty payload. This ensures we don't ignore them
+        if ( nbytes == total_read ) {
+            if ( client->mask_size == 4 && client->payload_size > 0 ) {
+                break;
+            } else if ( client->mask_size < 4 ) {
+                break;
+            }
         }
 
         if ( client->is_control_frame ) {

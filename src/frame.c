@@ -48,14 +48,14 @@ bool get_frame_type(Client *client, unsigned char byte) {
 
     // If our rsvs are invalid, then send a close frame and -1
     if ( valid_rsv_bits == false ) {
-        send_close_status(client, INVALID_EXTENSION);
+        send_close_status(client, PROTOCOL_ERROR);
         return false;
     } 
 
     uint8_t opcode = byte & 15;
     // Eliminate invalid opcode
     if ( (opcode > BINARY && opcode < CLOSE) || (opcode > PONG) ) {
-        send_close_status(client, INVALID_TYPE);
+        send_close_status(client, PROTOCOL_ERROR);
         return false;
     }
 

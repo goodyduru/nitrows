@@ -65,8 +65,16 @@ bool get_frame_type(Client *client, unsigned char byte) {
     if ( client->is_control_frame ) {
         client->control_type = opcode;
     }
-    else if ( !client->is_control_frame && opcode != CONTINUATION ) {
-        client->data_type = opcode;
+    else {
+        if ( !client->is_control_frame && opcode != CONTINUATION && client->data_type == INVALID ) {
+            client->data_type = opcode;
+        } else if ( opcode == CONTINUATION && client->data_type == INVALID ) {
+            send_close_status(client, PROTOCOL_ERROR);
+            return false;
+        } else if ( opcode != CONTINUATION && client->data_type != INVALID) {
+            send_close_status(client, PROTOCOL_ERROR);
+            return false;
+        }
     }
 
     if ( !client->is_final_frame && client->is_control_frame ) {
@@ -278,7 +286,7 @@ int64_t handle_data_frame(Client *client, unsigned char buf[], int size) {
             client->buffer_max_size = BUFFER_SIZE;
         } else if ( (client->buffer_max_size - client->current_data_frame_start) <           
                     client->payload_size ) {
-            uint64_t remaining_space = client->payload_size - client->buffer_max_size - client->current_data_frame_start;
+            uint64_t remaining_space = client->payload_size - (client->buffer_max_size - client->current_data_frame_start);
             remaining_space = (remaining_space + BUFFER_SIZE - 1) & ~(BUFFER_SIZE - 1); // Round to a multiple of buffer size
             if ( (client->buffer_max_size + remaining_space) > MAX_PAYLOAD_SIZE ) {
                 send_close_status(client, TOO_LARGE);
@@ -289,7 +297,7 @@ int64_t handle_data_frame(Client *client, unsigned char buf[], int size) {
         }
 
         data = client->buffer;
-        uint64_t to_copy_size = client->payload_size - client->buffer_size - client->current_data_frame_start;
+        uint64_t to_copy_size = client->payload_size - (client->buffer_size - client->current_data_frame_start);
 
         if ( to_copy_size >= size ) {
             memcpy(data+client->buffer_size, buf, size);
@@ -346,6 +354,7 @@ int64_t handle_data_frame(Client *client, unsigned char buf[], int size) {
     client->payload_size = 0;
     client->mask_size = 0;
     client->is_control_frame = false;
+    client->data_type = INVALID;
     if ( client->buffer != NULL ) {
         free(client->buffer);
         client->current_data_frame_start = 0;

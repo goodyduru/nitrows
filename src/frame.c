@@ -190,6 +190,13 @@ void unmask(Client *client, unsigned char buf[], int size) {
     }
 }
 
+/**
+ * This processes and responds to a close frame from the client. The spec
+ * defines various ways of responding to a close request. Here it responds
+ * based on the size of the payload. Most of the time, it tries to echo back
+ * the same valid status code that's processed. Empty close frame are sent for
+ * invalid code.
+ */
 void handle_close_frame(Client *client, unsigned char *data) {
     if ( client->payload_size == 0 ) {
         send_close_status(client, NORMAL);
@@ -204,6 +211,10 @@ void handle_close_frame(Client *client, unsigned char *data) {
         status_code = ntohs(status_code);
         printf("Received close frame with status %d\n", status_code);
         int16_t new_status_code = get_reply_code(status_code);
+        // -1 implies an invalid status code, more than 0 means a new code is
+        // sent. 0 means that the same code should be echoed back. Only greater
+        // than 0 requires a copy, since an echo means the code is already in
+        // the data.
         if ( new_status_code == -1 ) {
             send_close_status(client, 0);
             return;

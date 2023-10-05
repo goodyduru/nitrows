@@ -23,7 +23,7 @@ int8_t extract_header_data(Client *client, unsigned char buf[], int size);
  * @param client Connected client
  * @param byte Byte containing FIN, RSVS and OPCODE data
  * 
- * @returns successful set up.
+ * @returns true if first byte of header is valid, otherwise false
 */
 bool get_frame_type(Client *client, unsigned char byte);
 

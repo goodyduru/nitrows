@@ -16,6 +16,15 @@
 void handle_connection(int socketfd);
 
 /**
+ * Send http error response and close the connection
+ * 
+ * @param socketfd Client socket descriptor
+ * @param status_code HTTP status code
+ * @param message Response body
+ */
+void send_error_response(int socketfd, int status_code, char message[]);
+
+/**
  * Handles connection upgrade using the http protocol and it's successful, 
  * we create a client object and add it to our table. If not, we close the
  * connection and remove it from our loop.
@@ -25,7 +34,9 @@ void handle_connection(int socketfd);
 void handle_upgrade(int socketfd);
 
 /**
- * Send upgrade response handshake to a correct client handshake. The response might include a subprotocol or/and extension header if the request contained them.
+ * Send upgrade response handshake to a correct client handshake. The response
+ * might include a subprotocol or/and extension header if the request contained
+ * them.
  * 
  * @param socketfd Client socket descriptor
  * @param key Contains the Sec-Websocket-Key value. This function will

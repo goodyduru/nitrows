@@ -164,14 +164,14 @@ void handle_client_data(Client* client) {
         total_read += read;
         // Some frames have an empty payload. This ensures we don't ignore them
         if ( nbytes == total_read ) {
-            if ( client->mask_size == 4 && client->payload_size > 0 ) {
+            if ( client->mask_size == 4 && client->current_frame->payload_size > 0 ) {
                 break;
             } else if ( client->mask_size < 4 ) {
                 break;
             }
         }
 
-        if ( client->is_control_frame ) {
+        if ( client->current_frame->is_control ) {
             read = handle_control_frame(client, buf + total_read,
                                         nbytes - total_read);
         }

@@ -30,12 +30,11 @@ bool get_frame_type(Client *client, unsigned char byte);
 /**
  * Checks for the validity of the rsv bits
  * 
- * @param client Connected client
- * @param byte_data Byte containing rsv bits.
+ * @param frame Currently processed frame
  * 
  * @returns validity of rsv bits. False if not valid
 */
-bool are_rsv_bits_valid(Client *client, unsigned char byte_data);
+bool are_rsv_bits_valid(Frame *frame);
 
 /**
  * Get the payload size info and set it in client struct.
@@ -122,12 +121,9 @@ bool send_ping_frame(Client *client, unsigned char *message, uint8_t size);
  * Send data frame
  * 
  * @param client Connected client
- * @param message Ping message
- * @param size Message size
- * @param is_text Determines if message is binary or text
+ * @param message Data message
  * 
  * @returns true if successful, else false
 */
-bool send_data_frame(Client *client, unsigned char *message, uint64_t size,
-                    bool is_text);
+bool send_data_frame(Client *client, unsigned char *message);
 #endif

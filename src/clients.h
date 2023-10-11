@@ -6,6 +6,41 @@
 
 #include "./defs.h"
 
+typedef struct Frame Frame;
+
+/**
+ * This struct defines a Websocket frame. The frame references other frames. 
+ * A frame can have a type (control or data), it can be a first frame, or a 
+ * final frame. The type of frame will be stored in this struct.
+ */
+struct Frame {
+    Frame *next; // Next frame
+    bool is_first; // Is it a first frame
+
+    // A client can send multiple fragments of data. We need to know if the 
+    // currently processed frame is the final frame so that the data can be
+    // handled once we receive all its data.
+    bool is_final;
+    bool rsv1;
+    bool rsv2;
+    bool rsv3;
+
+    // A client can send a control frame singly or in the middle of a 
+    // fragmented data frame. This attribute determines if the frame is a 
+    // control frame or not.
+    bool is_control;
+    Opcode type; // Frame type
+    uint64_t payload_size; // Payload size for current payload
+
+    // The payload of an incomplete or fragrmented data frame has to be stored
+    // somewhere. These last 3 elements handle everything concerning this.
+    // These values hold across multiple frames of fragmented data. The buffer
+    // array contains the data received so far. The buffer_size element
+    // determines the size of received data in the buffer array.
+    uint64_t buffer_size;
+    unsigned char *buffer;
+};
+
 typedef struct Client Client;
 
 /**
@@ -22,18 +57,6 @@ typedef struct Client Client;
 struct Client {
     int socketfd; // client socket descriptor
     Connection_status status;
-
-    // A client can send multiple fragments of data. We need to know if the 
-    // currently processed frame is the final frame so that the data can be
-    // handled once we receive all its data.
-    bool is_final_frame;
-
-    // A client can send a control frame singly or in the middle of a 
-    // fragmented data frame. This attribute determines if the currently 
-    // processed frame is a control frame or not. We need to know this to 
-    // determine where to store the payload data.
-    bool is_control_frame;
-
     // Determine whether we are in the middle of processing a frame or not.
     bool in_frame;
 
@@ -45,40 +68,13 @@ struct Client {
     uint8_t header_size;
     unsigned char current_header[9];
 
-    // The size of the payload data in the currently processed frame.
-    uint64_t payload_size;
-
     // Frame mask for the currently processed frame.
     uint8_t mask_size;
     unsigned char mask[4];
-
-    // Type of control frame being processed.
-    Opcode control_type;
-
-    // We store incomplete control frame data here for use later
-    unsigned char *control_data;
-
-    // Size of control frame data buffer
-    uint8_t control_data_size;
-
-    // Type of data frame being processed. This holds across multiple frames of 
-    // fragmented data
-    Opcode data_type;
-
-    // Index of current data frame within `buffer`
-    uint64_t current_data_frame_start;
-
-    // The payload of an incomplete or fragrmented data frame has to be stored
-    // somewhere. These last 3 elements handle everything concerning this.
-    // These values hold across multiple frames of fragmented data. The buffer
-    // array contains the data received so far. The buffer_size element
-    // determines the size of received data in the buffer array. The
-    // buffer_max_size element determines the max size of the buffer array. We
-    // can increase this size to a limit if it the array size isn't upto the
-    // expected data size.
-    uint64_t buffer_size;
-    uint64_t buffer_max_size;
-    unsigned char *buffer;
+    // Current frame that we are handling. Can be a data frame or a control 
+    // frame
+    Frame *current_frame;  
+    Frame *data_frames; // List of frames, starting from the first frame.
 };
 
 typedef struct Node Node;
@@ -123,9 +119,10 @@ Client *get_client(int socketfd);
 void delete_client(Client *client);
 
 /**
- * Internal function, free client and its members.
- */
-void __free_client(Client *client);
+ * Free all the frames in a client
+*/
+void free_frames(Client *client);
+
 
 /**
  * Resets a client back to its default state. This is done after sending a

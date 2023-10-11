@@ -8,6 +8,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "clients.h"
+
 #define UTF8_ACCEPT 0
 #define UTF8_REJECT 1
 
@@ -44,5 +46,23 @@ bool validate_utf8(char *str, size_t len) {
     }
 
     return state == UTF8_ACCEPT;
+}
+
+bool validate_frames(Frame *frames) {
+  Frame *current = frames;
+  size_t i;
+  uint32_t type;
+  uint8_t state = UTF8_ACCEPT;
+  while ( current != NULL ) {
+    for (i = 0; i < current->payload_size; i++) {
+      type = utf8d[(uint8_t)current->buffer[i]];
+      state = utf8d[256 + state * 16 + type];
+
+      if (state == UTF8_REJECT)
+          break;
+    }
+    current = current->next;
+  }
+  return state == UTF8_ACCEPT;
 }
 #endif

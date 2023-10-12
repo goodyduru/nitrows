@@ -14,7 +14,6 @@ typedef struct Frame Frame;
  * final frame. The type of frame will be stored in this struct.
  */
 struct Frame {
-    Frame *next; // Next frame
     bool is_first; // Is it a first frame
 
     // A client can send multiple fragments of data. We need to know if the 
@@ -36,7 +35,10 @@ struct Frame {
     // somewhere. These last 3 elements handle everything concerning this.
     // These values hold across multiple frames of fragmented data. The buffer
     // array contains the data received so far. The buffer_size element
-    // determines the size of received data in the buffer array.
+    // determines the size of received data in the buffer array. For data
+    // frames, the buffer pointer points to a section of the shared buffer
+    // array that all data frames share. For control frames, the buffer is just 
+    // a buffer of size `payload_size`.
     uint64_t buffer_size;
     unsigned char *buffer;
 };
@@ -57,8 +59,6 @@ typedef struct Client Client;
 struct Client {
     int socketfd; // client socket descriptor
     Connection_status status;
-    // Determine whether we are in the middle of processing a frame or not.
-    bool in_frame;
 
     // It is possible for the header of a frame to be in 2 different network 
     // recv buffers. We need a place to store the header info in this scenario. 
@@ -73,8 +73,15 @@ struct Client {
     unsigned char mask[4];
     // Current frame that we are handling. Can be a data frame or a control 
     // frame
-    Frame *current_frame;  
-    Frame *data_frames; // List of frames, starting from the first frame.
+    Frame *current_frame;
+
+    uint32_t frame_size; // Data frame array size
+    uint32_t frame_count; // Number of frames in array
+    Frame *data_frames; // Array of frames, starting from the first frame.
+
+    uint64_t buffer_limit; // Buffer size
+    uint64_t buffer_size; // Amount of bytes in buffer
+    unsigned char *shared_buffer; // Buffer containing all data frame bytes
 };
 
 typedef struct Node Node;
@@ -119,18 +126,9 @@ Client *get_client(int socketfd);
 void delete_client(Client *client);
 
 /**
- * Free all the frames in a client
-*/
-void free_frames(Client *client);
-
-
-/**
- * Resets a client back to its default state. This is done after sending a
- * response to the client and there are no data to process.
- * 
- * @param client Pointer to client struct
-*/
-void reset_client(Client *client);
+ * Internal function, free client and its members.
+ */
+void __free_client(Client *client);
 
 // For debugging purposes
 void print_client(Client *client);

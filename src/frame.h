@@ -30,11 +30,13 @@ bool get_frame_type(Client *client, unsigned char byte);
 /**
  * Checks for the validity of the rsv bits
  * 
- * @param frame Currently processed frame
+ * @param rsv1
+ * @param rsv2
+ * @param rsv3
  * 
  * @returns validity of rsv bits. False if not valid
 */
-bool are_rsv_bits_valid(Frame *frame);
+bool are_rsv_bits_valid(bool rsv1, bool rsv2, bool rsv3);
 
 /**
  * Get the payload size info and set it in client struct.

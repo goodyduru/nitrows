@@ -18,7 +18,6 @@ Client *init_client(int socketfd) {
     // Initialize the client with some of its members default values.
     client->socketfd = socketfd;
     client->status = CONNECTED;
-    client->in_frame = false;
     
     // We are going to use socketfd as the hashtable key
     index = socketfd % HASHTABLE_SIZE;
@@ -62,8 +61,7 @@ void delete_client(Client *client) {
     prev = clients_table[index];
     // Nothing is found in table. That will be strange, but we want to be robust
     if ( prev == NULL ) {
-        free_frames(client);
-        free(client);
+        __free_client(client);
         return;
     }
 
@@ -72,8 +70,7 @@ void delete_client(Client *client) {
     if ( prev->client == client ) {
         current = prev;
         clients_table[index] = current->next;
-        free_frames(client);
-        free(client);
+        __free_client(client);
         free(current);
         return;
     }
@@ -88,37 +85,30 @@ void delete_client(Client *client) {
     }
 
     // Free client and its frames
-    free_frames(client);
-    free(client);
+    __free_client(client);
     if ( current != NULL )
         free(current);
     return;
 }
 
-void free_frames(Client *client) {
-    // Free current frame if it's a control frame.
+void __free_client(Client *client) {
+    if ( client->data_frames != NULL ) {
+        free(client->data_frames);
+    }
     if ( client->current_frame != NULL && client->current_frame->is_control ) {
         free(client->current_frame);
     }
-    Frame *current = client->data_frames;
-    Frame *next;
-    while ( current != NULL ) {
-        if ( current->buffer != NULL )
-            free(current->buffer);
-        next = current->next;
-        free(current);
-        current = next;
-    }
-    
-    client->data_frames = NULL;
-    client->current_frame = NULL;
+    if ( client->shared_buffer != NULL )
+        free(client->shared_buffer);
+
+    free(client);
 }
 
 void print_client(Client *client) {
     printf("Client info\n");
     printf("Socket: %d\n", client->socketfd);
     printf("Status: %d\n", client->status);
-    printf("Processing frame: %d\n", client->in_frame);
+    printf("Processing frame: %d\n", (client->current_frame != NULL));
     printf("Header size: %d\n", client->header_size);
     printf("Mask size: %d\n", client->mask_size);
     printf("Mask: %x%x%x%x\n", client->mask[0], client->mask[1], client->mask[2], client->mask[3]);
@@ -129,9 +119,9 @@ void print_client(Client *client) {
         printf("Is final %d\n", client->current_frame->is_final);
     }
     if ( client->data_frames != NULL ) {
-        printf("Type: %d\n", client->data_frames->type);
-        printf("Data size: %llu\n", client->data_frames->payload_size);
-        printf("Buffer size: %llu\n", client->data_frames->buffer_size);
-        printf("Is final %d\n", client->data_frames->is_final);
+        printf("Type: %d\n", client->data_frames[0].type);
+        printf("Data size: %llu\n", client->data_frames[0].payload_size);
+        printf("Buffer size: %llu\n", client->data_frames[0].buffer_size);
+        printf("Is final %d\n", client->data_frames[0].is_final);
     }
 }

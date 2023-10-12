@@ -7,6 +7,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define EXTENSION_KEY_LENGTH 64
+#define EXTENSION_VALUE_LENGTH 256
+#define WAITING_CLIENT_TABLE_SIZE 256
+
 typedef struct Extension Extension;
 struct Extension {
     char *key; // header extension token
@@ -48,6 +52,29 @@ Extension *extension_table;
 // I mean come on! It shouldn't be more than 256 extensions.
 int8_t extension_count;
 
+/** 
+ * This is where a list semi-parsed Sec-Websocket-Extensions header values will 
+ * be stored. This struct is made to be flexible i.e the values can be updated.
+ */
+
+typedef struct extension_list ExtensionList;
+
+struct extension_list {
+    ExtensionList *next;
+    char key[EXTENSION_KEY_LENGTH];
+    char value[EXTENSION_VALUE_LENGTH];
+};
+
+typedef struct waiting_clients WaitingClient;
+
+struct waiting_clients {
+    WaitingClient *next;
+    int socketfd;
+    ExtensionList *extensions;
+};
+
+// Table containing all the connected clients.
+WaitingClient *waiting_clients_table[WAITING_CLIENT_TABLE_SIZE];
 
 /**
  * This function registers Sec-Websocket-Extensions handlers for different points of processing data from accepting connection to responding with data.
@@ -67,4 +94,29 @@ void register_extension(char *key, bool (*parse_offer)(int,char*,uint16_t),
                            bool (*process_data)(int,char*,int,char**,int*),
                            void (*close)(int)
                         );
+
+/**
+ * Get a waiting client from the waiting client table. If none, add 
+ * a new one to the table and return the extension headers list
+ * 
+ * @param socketfd Client socket descriptor
+ * @return Header Extension list
+ */
+ ExtensionList *get_extensions(int socketfd);
+
+/**
+ * Delete extensions and its containing waiting client from the table.
+ *
+ * @param client Pointer to client struct
+ */
+void delete_extensions(int socketfd);
+
+/**
+ * Get extension parameters from an extensions list with a key. 
+ * 
+ * @param list List of extension tokens
+ * @param key Extension token list
+ * @param create Determines if an extension token is created if not found.
+*/
+char* get_extension_params(ExtensionList *list, char *key, bool create);
 #endif

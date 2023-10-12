@@ -78,8 +78,10 @@ void delete_client(Client *client) {
     // Search for client in list
     current = prev->next;
     while ( current != NULL ) {
-        if ( current->client == client )
+        if ( current->client == client ) {
+            prev->next = current->next;
             break;
+        }
         prev = current;
         current = current->next;
     }

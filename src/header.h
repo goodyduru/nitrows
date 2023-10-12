@@ -75,9 +75,8 @@ int16_t get_subprotocols(int socketfd, char *start, char subprotocol[],
 /**
  * Check the validity of the `Sec-Websocket-Extensions` header in
  * the opening request sent by the client. This header is optional, so absence
- * of the header is valid. Once there's a value, then it has to have a valid
- * format. Send an error response if the checks fails. We return the first
- * extension and its length in the provided parameters.
+ * of the header is valid. Once there's a value, we parse it and hand it over 
+ * to the available extensions handlers.
  * 
  * @param socketfd Client socket descriptor
  * @param start Pointer to start of header value
@@ -87,7 +86,7 @@ int16_t get_subprotocols(int socketfd, char *start, char subprotocol[],
  * 
  * @return Increase in position. -1 if invalid
  */
-int16_t get_extensions(int socketfd, char *start, char extension[],
+int16_t parse_extensions(int socketfd, char *start, char extension[],
                                 int *extension_len);
 
 

@@ -30,6 +30,7 @@ void nitrows_register_extension(char *key, bool (*parse_offer)(int,char*,uint16_
 
 int main(){
     extension_table = NULL;
+    nitrows_register_extension("permessage-default", NULL, NULL, NULL, NULL, NULL);
     int listener_socket = get_listener_socket();
     init_event_loop();
     add_to_event_loop(listener_socket);

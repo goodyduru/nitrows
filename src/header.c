@@ -122,7 +122,7 @@ int16_t get_subprotocols(int socketfd, char *start, char subprotocol[],
     return p - start;
 }
 
-int16_t get_extensions(int socketfd, char *start, char extension[],
+int16_t parse_extensions(int socketfd, char *start, char extension[],
                                 int *extension_len) {
     char *p = start;
 
@@ -203,7 +203,7 @@ bool validate_headers(char buf[], int socketfd, char key[], char subprotocol[],
                 p += progress;
                 break;
             } else {
-                if ( (progress = get_extensions(socketfd, p, extension,
+                if ( (progress = parse_extensions(socketfd, p, extension,
                                         &extension_len)) == -1) {
                     return false;
                 }

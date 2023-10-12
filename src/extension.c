@@ -31,7 +31,7 @@ void register_extension(char *key, bool (*parse_offer)(int,char*,uint16_t),
 }
 
 
-ExtensionList *get_extensions(int socketfd) {
+ExtensionList *get_extension_list(int socketfd) {
     int index; // Index in the table
 
     // We get the index of the client using the socket descriptor as 

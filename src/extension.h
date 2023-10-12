@@ -102,7 +102,7 @@ void register_extension(char *key, bool (*parse_offer)(int,char*,uint16_t),
  * @param socketfd Client socket descriptor
  * @return Header Extension list
  */
- ExtensionList *get_extensions(int socketfd);
+ ExtensionList *get_extension_list(int socketfd);
 
 /**
  * Delete extensions and its containing waiting client from the table.

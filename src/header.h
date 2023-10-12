@@ -5,6 +5,7 @@
 #define INCLUDED_HEADER_DOT_H
 
 #include <stdbool.h>
+#include "extension.h"
 /**
  * Move header to next line and make sure newlines are valid.
  * 
@@ -80,14 +81,12 @@ int16_t get_subprotocols(int socketfd, char *start, char subprotocol[],
  * 
  * @param socketfd Client socket descriptor
  * @param start Pointer to start of header value
- * @param extension This will contain the chosen extension
- * @param extension_len This will contain the pointer to the chosen extension
+ * @param token_list List of extension tokens
  * length
  * 
  * @return Increase in position. -1 if invalid
  */
-int16_t parse_extensions(int socketfd, char *start, char extension[],
-                                int *extension_len);
+int16_t parse_extensions(int socketfd, char *start, ExtensionList *extension_list);
 
 
 /**

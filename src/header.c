@@ -122,26 +122,90 @@ int16_t get_subprotocols(int socketfd, char *start, char subprotocol[],
     return p - start;
 }
 
-int16_t parse_extensions(int socketfd, char *start, char extension[],
-                                int *extension_len) {
+int16_t parse_extensions(int socketfd, char *start,
+                        ExtensionList *extension_list) {
+    bool IN_QUOTE = false;
+    bool IN_ESCAPE = false;
     char *p = start;
+    char error[] = "Invalid Sec-Websocket-Extensions header";
 
     while ( *p == ' ' || *p == '\t' ) {
         p++;
     }
     if ( *p == '\0' || *p == '\r' || *p == '\n' || *p == ',') {
-        send_error_response(socketfd, 400,
-                            "Invalid Sec-Websocket-Extensions header");
+        send_error_response(socketfd, 400, error);
         return -1;
     }
-    int i = 0;
-    while ( i < 99 && *p != '\0' && *p != ','  && *p != '\r' && *p != '\n' ) {
-        extension[i] = *p;
-        i++;
+    char temp[EXTENSION_VALUE_LENGTH];
+    char key[EXTENSION_KEY_LENGTH];
+    uint16_t i = 0;
+    uint16_t j = 0;
+    bool hasExtension = false;
+    char c, *params;
+    while ( *p != '\0' && *p != '\r' && *p != '\n' ) {
+        c = *p;
+        if ( !hasExtension && i == (EXTENSION_KEY_LENGTH - 1) ) {
+            send_error_response(socketfd, 400, error);
+            return -1;
+        }
+        if ( hasExtension && j == (EXTENSION_VALUE_LENGTH - 1) ) {
+            send_error_response(socketfd, 400, error);
+            return -1;
+        }
+        if ( c == '"' && !IN_ESCAPE ) {
+            IN_QUOTE = !IN_QUOTE;
+            if ( hasExtension ) {
+                temp[j] = c;
+                j++;
+            } else {
+                temp[i] = c;
+                i++;
+            }
+        } else if ( c == '\\' && !IN_QUOTE ) {
+            IN_ESCAPE = !IN_ESCAPE;
+            if ( hasExtension ) {
+                temp[j] = c;
+                j++;
+            } else {
+                temp[i] = c;
+                i++;
+            }
+        } else if ( !hasExtension && ( c == ' ' || c == '\t') && i == 0 ) {
+            p++;
+            continue;
+        } else if ( !hasExtension && c == ';' && !IN_QUOTE ) {
+            hasExtension = true;
+            key[i] = '\0';
+        } else if ( !hasExtension && c == ',' && !IN_QUOTE ) {
+            // Extension is empty. We add to token list
+            key[i] = '\0';
+            params = get_extension_params(extension_list, key, true);
+            i = 0;
+        } else if ( !hasExtension ) {
+            key[i] = c;
+            i++;
+        } else if ( hasExtension && c == ',' && !IN_QUOTE ) {
+            temp[j] = '\0';
+            params = get_extension_params(extension_list, key, true);
+            size_t param_len = strlen(params);
+            if ( (param_len + j) >= EXTENSION_VALUE_LENGTH ) {
+                send_error_response(socketfd, 400, error);
+                return -1;
+            }
+            strcpy(params+param_len, temp);
+            hasExtension = false;
+            i = 0;
+            j = 0;
+        }  else if ( hasExtension && ( c == ' ' || c == '\t') && j == 0 ) {
+            p++;
+            continue;
+        } else if ( hasExtension ) {
+            temp[j] = c;
+            j++;
+        }
         p++;
+        continue;
     }
-    *extension_len = i;
-    extension[i] = '\0';
     return p - start;
 }
 
@@ -159,6 +223,7 @@ bool validate_headers(char buf[], int socketfd, char key[], char subprotocol[],
     bool required_headers_present[] = {false, false, false, false}; // Store required headers check status here.
     p = buf;
     request_length = strlen(buf);
+    ExtensionList *list = get_extension_list(socketfd);
 
     while ( *p != '\0' && (p - buf) < request_length && 
             *p != '\r' && *p != '\n' ) {
@@ -203,8 +268,7 @@ bool validate_headers(char buf[], int socketfd, char key[], char subprotocol[],
                 p += progress;
                 break;
             } else {
-                if ( (progress = parse_extensions(socketfd, p, extension,
-                                        &extension_len)) == -1) {
+                if ( (progress = parse_extensions(socketfd, p, list)) == -1) {
                     return false;
                 }
                 p += progress;

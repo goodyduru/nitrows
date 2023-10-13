@@ -180,6 +180,14 @@ int16_t parse_extensions(int socketfd, char *start,
             // Extension is empty. We add to token list
             key[i] = '\0';
             params = get_extension_params(extension_list, key, true);
+            size_t param_len = strlen(params);
+            if ( (param_len + j + 1) >= EXTENSION_VALUE_LENGTH ) {
+                send_error_response(socketfd, 400, error);
+                return -1;
+            }
+            params[param_len] = ',';
+            param_len++;
+            params[param_len] = '\0';
             i = 0;
         } else if ( !hasExtension ) {
             key[i] = c;
@@ -188,10 +196,14 @@ int16_t parse_extensions(int socketfd, char *start,
             temp[j] = '\0';
             params = get_extension_params(extension_list, key, true);
             size_t param_len = strlen(params);
-            if ( (param_len + j) >= EXTENSION_VALUE_LENGTH ) {
+            if ( (param_len + j + 1) >= EXTENSION_VALUE_LENGTH ) {
                 send_error_response(socketfd, 400, error);
                 return -1;
             }
+            if ( param_len > 0 ) {
+                params[param_len] = ',';
+                param_len++;
+            }  
             strcpy(params+param_len, temp);
             hasExtension = false;
             i = 0;
@@ -205,6 +217,32 @@ int16_t parse_extensions(int socketfd, char *start,
         }
         p++;
         continue;
+    }
+
+    if ( !hasExtension && i > 0 ) {
+        key[i] = '\0';
+        params = get_extension_params(extension_list, key, true);
+        size_t param_len = strlen(params);
+        if ( (param_len + j + 1) >= EXTENSION_VALUE_LENGTH ) {
+            send_error_response(socketfd, 400, error);
+            return -1;
+        }
+        params[param_len] = ',';
+        param_len++;
+        params[param_len] = '\0';
+    } else if ( hasExtension && j > 0 ) {
+        key[j] = '\0';
+        params = get_extension_params(extension_list, key, true);
+        size_t param_len = strlen(params);
+        if ( (param_len + j + 1) >= EXTENSION_VALUE_LENGTH ) {
+            send_error_response(socketfd, 400, error);
+            return -1;
+        }
+        if ( param_len > 0 ) {
+            params[param_len] = ',';
+            param_len++;
+        }  
+        strcpy(params+param_len, temp);
     }
     return p - start;
 }

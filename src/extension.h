@@ -119,4 +119,6 @@ void delete_extensions(int socketfd);
  * @param create Determines if an extension token is created if not found.
 */
 char* get_extension_params(ExtensionList *list, char *key, bool create);
+
+void print_list(ExtensionList *list);
 #endif

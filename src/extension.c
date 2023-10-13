@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "extension.h"
@@ -121,4 +122,12 @@ char* get_extension_params(ExtensionList *list, char *key, bool create) {
         return list->value;
     }
     return NULL;
+}
+
+void print_list(ExtensionList *list) {
+    while ( list != NULL ) {
+        printf("Key: %s\n", list->key);
+        printf("Value: %s\n", list->value);
+        list = list->next;
+    }
 }

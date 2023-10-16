@@ -171,7 +171,6 @@ int16_t parse_extensions(int socketfd, char *line,
                 current_params->value_type = BOOL;
                 current_params->bool_type = true;
                 current_params->is_last = true;
-                has_extension = false;
             } else {
                 has_extension = true;
             }

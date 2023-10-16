@@ -98,16 +98,19 @@ void delete_extensions(int socketfd) {
     return;
 }
 
-char* get_extension_params(ExtensionList *list, char *key, bool create) {
-    if ( strlen(list->key) == 0 ) {
-        strcpy(list->key, key);
-        return list->value;
+ExtensionParam* get_extension_params(ExtensionList *list, char *key, bool create) {
+    if ( strlen(list->token) == 0 && create ) {
+        strncpy(list->token, key, EXTENSION_TOKEN_LENGTH);
+        list->token[EXTENSION_TOKEN_LENGTH]  = '\0';
+        list->params = (ExtensionParam *)calloc(1, sizeof(ExtensionParam));
+        list->params->value_type = EMPTY;
+        return list->params;
     }
 
     ExtensionList *prev = list;
     while ( list != NULL ) {
-        if ( strcmp(list->key, key) == 0 ) {
-            return list->value;
+        if ( strcmp(list->token, key) == 0 ) {
+            return list->params;
         }
         prev = list;
         list = list->next;
@@ -118,16 +121,40 @@ char* get_extension_params(ExtensionList *list, char *key, bool create) {
             prev->next = (ExtensionList *)calloc(1, sizeof(ExtensionList));
             list = prev->next;
         }
-        strcpy(list->key, key);
-        return list->value;
+        strncpy(list->token, key, EXTENSION_TOKEN_LENGTH);
+        list->token[EXTENSION_TOKEN_LENGTH] = '\0';
+        list->params = (ExtensionParam *)calloc(1, sizeof(ExtensionParam));
+        list->params->value_type = EMPTY;
+        return list->params;
     }
     return NULL;
 }
 
 void print_list(ExtensionList *list) {
+    ExtensionParam *param;
+    char truthy[] = "truth";
+    char falsy[] = "false";
     while ( list != NULL ) {
-        printf("Key: %s\n", list->key);
-        printf("Value: %s\n", list->value);
+        printf("Key: %s\n", list->token);
+        param = list->params;
+        while ( param != NULL ) {
+            switch ( param->value_type ) {
+                case BOOL:
+                    printf("\t%s=%s\n", param->key, (param->bool_type ? truthy : falsy));
+                    break;
+                case INT:
+                    printf("\t%s=%lld\n", param->key, param->int_type);
+                    break;
+                case STRING:
+                    printf("\t%s=%s\n", param->key, param->string_type);
+                default:
+                    printf("Empty\n");
+            }
+            if ( param->is_last && param->next != NULL ) {
+                printf("Another set\n");
+            }
+            param = param->next;
+        }
         list = list->next;
     }
 }

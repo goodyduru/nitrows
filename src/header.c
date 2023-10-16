@@ -122,129 +122,172 @@ int16_t get_subprotocols(int socketfd, char *start, char subprotocol[],
     return p - start;
 }
 
-int16_t parse_extensions(int socketfd, char *start,
+int16_t parse_extensions(int socketfd, char *line,
                         ExtensionList *extension_list) {
     bool IN_QUOTE = false;
-    bool IN_ESCAPE = false;
-    char *p = start;
+    char *p = line;
     char error[] = "Invalid Sec-Websocket-Extensions header";
-
     while ( *p == ' ' || *p == '\t' ) {
         p++;
     }
-    if ( *p == '\0' || *p == '\r' || *p == '\n' || *p == ',') {
+    if ( *p == '\0' || *p == '\r' || *p == '\n' || *p == ',' || *p == ';') {
         send_error_response(socketfd, 400, error);
         return -1;
     }
-    char temp[EXTENSION_VALUE_LENGTH];
-    char key[EXTENSION_KEY_LENGTH];
-    uint16_t i = 0;
-    uint16_t j = 0;
-    bool hasExtension = false;
-    char c, *params;
+    char *start = NULL;
+    int8_t i, key_length, length = 0;
+    bool is_digit, has_extension = false;
+    char c, key[EXTENSION_TOKEN_LENGTH+1];
+    ExtensionParam *prev_params, *current_params = NULL;
     while ( *p != '\0' && *p != '\r' && *p != '\n' ) {
         c = *p;
-        if ( !hasExtension && i == (EXTENSION_KEY_LENGTH - 1) ) {
-            send_error_response(socketfd, 400, error);
-            return -1;
-        }
-        if ( hasExtension && j == (EXTENSION_VALUE_LENGTH - 1) ) {
-            send_error_response(socketfd, 400, error);
-            return -1;
-        }
-        if ( c == '"' && !IN_ESCAPE ) {
+        if ( c == '"' ) {
             IN_QUOTE = !IN_QUOTE;
-            if ( hasExtension ) {
-                temp[j] = c;
-                j++;
-            } else {
-                temp[i] = c;
-                i++;
-            }
-        } else if ( c == '\\' && !IN_QUOTE ) {
-            IN_ESCAPE = !IN_ESCAPE;
-            if ( hasExtension ) {
-                temp[j] = c;
-                j++;
-            } else {
-                temp[i] = c;
-                i++;
-            }
-        } else if ( !hasExtension && ( c == ' ' || c == '\t') && i == 0 ) {
+        } else if ( !has_extension && ( c == ' ' || c == '\t') && start == NULL && !IN_QUOTE ) {
             p++;
             continue;
-        } else if ( !hasExtension && c == ';' && !IN_QUOTE ) {
-            hasExtension = true;
-            key[i] = '\0';
-        } else if ( !hasExtension && c == ',' && !IN_QUOTE ) {
-            // Extension is empty. We add to token list
-            key[i] = '\0';
-            params = get_extension_params(extension_list, key, true);
-            size_t param_len = strlen(params);
-            if ( (param_len + j + 1) >= EXTENSION_VALUE_LENGTH ) {
+        } else if ( !has_extension && length == 0 && (c == ',' || c == ';') && !IN_QUOTE ) {
+            send_error_response(socketfd, 400, error);
+            return -1;
+        } else if ( !has_extension && ( c == ';' || c == ',') && !IN_QUOTE && start != NULL ) {
+            if ( length > EXTENSION_TOKEN_LENGTH ) {
                 send_error_response(socketfd, 400, error);
                 return -1;
             }
-            params[param_len] = ',';
-            param_len++;
-            params[param_len] = '\0';
-            i = 0;
-        } else if ( !hasExtension ) {
-            key[i] = c;
-            i++;
-        } else if ( hasExtension && c == ',' && !IN_QUOTE ) {
-            temp[j] = '\0';
-            params = get_extension_params(extension_list, key, true);
-            size_t param_len = strlen(params);
-            if ( (param_len + j + 1) >= EXTENSION_VALUE_LENGTH ) {
+            strncpy(key, start, length);
+            key[EXTENSION_TOKEN_LENGTH] = '\0';
+            start = NULL;
+            length = 0;
+            current_params = get_extension_params(extension_list, key, true);
+            while ( current_params != NULL && current_params->value_type != EMPTY ) {
+                prev_params = current_params;
+                current_params = current_params->next;
+            }
+            if ( current_params == NULL ) {
+                prev_params->next = calloc(1, sizeof(ExtensionParam));
+                current_params = prev_params->next;
+            }
+            if ( c == ',' ) {
+                current_params->value_type = BOOL;
+                current_params->bool_type = true;
+                current_params->is_last = true;
+                has_extension = false;
+            } else {
+                has_extension = true;
+            }
+        } else if ( has_extension && (c == ',' || c == ';' || c == '=') && !IN_QUOTE && start != NULL ) {
+            if ( length > EXTENSION_TOKEN_LENGTH ) {
                 send_error_response(socketfd, 400, error);
                 return -1;
             }
-            if ( param_len > 0 ) {
-                params[param_len] = ',';
-                param_len++;
-            }  
-            strcpy(params+param_len, temp);
-            hasExtension = false;
-            i = 0;
-            j = 0;
-        }  else if ( hasExtension && ( c == ' ' || c == '\t') && j == 0 ) {
+            if ( current_params->value_type != EMPTY ) {
+                current_params->next = calloc(1, sizeof(ExtensionParam));
+                current_params = current_params->next;
+            }
+            key_length = strlen(current_params->key);
+            is_digit = true;
+            for (i = 0; i < length; i++) {
+                is_digit &= isdigit(*(start+i));
+                if ( !is_digit ) {
+                    break;
+                }
+            }
+            if ( key_length == 0 && !is_digit ) {
+                strncpy(current_params->key, start, length);
+                current_params->key[length] = '\0';
+                if (c == ',' || c == ';') {
+                    current_params->value_type = BOOL;
+                    current_params->bool_type = true;
+                }
+            } else if ( is_digit ) {
+                if ( c == '=' ) {
+                    strncpy(current_params->key, start, length);
+                    current_params->string_type[length] = '\0';
+                    current_params->value_type = STRING;
+                }
+                else {
+                    for ( i = 0; i < length; i++ ) {
+                        current_params->int_type = current_params->int_type*10 + (*(start+i) - '0');
+                    }
+                    current_params->value_type = INT;
+                }
+            } else if ( key_length > 0 ) {
+                strncpy(current_params->string_type, start, length);
+                current_params->string_type[length] = '\0';
+                current_params->value_type = STRING;
+            }
+            if ( c == ',' ) {
+                current_params->is_last = true;
+                has_extension = false;
+            }
+            start = NULL;
+            length = 0;
+        }  else if ( has_extension && ( c == ' ' || c == '\t') && start == NULL && !IN_QUOTE ) {
             p++;
             continue;
-        } else if ( hasExtension ) {
-            temp[j] = c;
-            j++;
+        } else {
+            if ( start == NULL ) {
+                start = p;
+            }
+            length++;
         }
         p++;
         continue;
     }
-
-    if ( !hasExtension && i > 0 ) {
-        key[i] = '\0';
-        params = get_extension_params(extension_list, key, true);
-        size_t param_len = strlen(params);
-        if ( (param_len + j + 1) >= EXTENSION_VALUE_LENGTH ) {
-            send_error_response(socketfd, 400, error);
-            return -1;
-        }
-        params[param_len] = ',';
-        param_len++;
-        params[param_len] = '\0';
-    } else if ( hasExtension && j > 0 ) {
-        key[j] = '\0';
-        params = get_extension_params(extension_list, key, true);
-        size_t param_len = strlen(params);
-        if ( (param_len + j + 1) >= EXTENSION_VALUE_LENGTH ) {
-            send_error_response(socketfd, 400, error);
-            return -1;
-        }
-        if ( param_len > 0 ) {
-            params[param_len] = ',';
-            param_len++;
-        }  
-        strcpy(params+param_len, temp);
+    if ( start == NULL || IN_QUOTE ) {
+         return p - line;
     }
-    return p - start;
+    if ( length > EXTENSION_TOKEN_LENGTH ) {
+        send_error_response(socketfd, 400, error);
+        return -1;
+    }
+    if ( !has_extension ) {
+        strncpy(key, start, length);
+        key[EXTENSION_TOKEN_LENGTH] = '\0';
+        current_params = get_extension_params(extension_list, key, true);
+        while ( current_params != NULL && current_params->value_type != EMPTY ) {
+            prev_params = current_params;
+            current_params = current_params->next;
+        }
+        if ( current_params == NULL ) {
+            prev_params->next = calloc(1, sizeof(ExtensionParam));
+            current_params = prev_params->next;
+        }
+        current_params->value_type = BOOL;
+        current_params->bool_type = true;
+        current_params->is_last = true;
+    } 
+    else {
+        if ( current_params->value_type != EMPTY ) {
+            current_params->next = calloc(1, sizeof(ExtensionParam));
+            current_params = current_params->next;
+        }
+        key_length = strlen(current_params->key);
+        is_digit = true;
+        for (i = 0; i < length; i++) {
+            is_digit &= isdigit(*(start+i));
+            if ( !is_digit ) {
+                break;
+            }
+        }
+        if ( key_length == 0 && !is_digit ) {
+            strncpy(current_params->key, start, length);
+            current_params->key[length] = '\0';
+            current_params->value_type = BOOL;
+            current_params->bool_type = true;
+        } else if ( is_digit ) {
+            for ( i = 0; i < length; i++ ) {
+                current_params->int_type = current_params->int_type*10 + (*(start+i) - '0');
+            }
+            current_params->value_type = INT;
+        } else if ( key_length > 0 ) {
+            strncpy(current_params->string_type, start, length);
+            current_params->string_type[length] = '\0';
+            current_params->value_type = STRING;
+        }
+        current_params->is_last = true;
+    }
+    return p - line;
 }
 
 bool validate_headers(char buf[], int socketfd, char key[], char subprotocol[],

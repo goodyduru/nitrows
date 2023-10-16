@@ -7,8 +7,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define EXTENSION_KEY_LENGTH 64
-#define EXTENSION_VALUE_LENGTH 256
+#define EXTENSION_TOKEN_LENGTH 31
 #define WAITING_CLIENT_TABLE_SIZE 256
 
 typedef struct Extension Extension;
@@ -52,24 +51,60 @@ Extension *extension_table;
 // I mean come on! It shouldn't be more than 256 extensions.
 int8_t extension_count;
 
-/** 
- * This is where a list semi-parsed Sec-Websocket-Extensions header values will 
- * be stored. This struct is made to be flexible i.e the values can be updated.
- */
+/**
+ * A param value can be of any type. This enum defines the supported types.
+ * It is liable to change in the future.
+*/
 
+typedef enum ValueType ValueType;
+
+enum ValueType { EMPTY, INT, BOOL, STRING };
+
+/**
+ * Struct for representing a list of extension params. Each param might have a
+ * key or not. If there is no key, it implies that the parent extension has the
+ * value e.g permessage-default,foo;exclude. will have permessage-default
+ * having a value true with no key. The value can be any type and that is
+ * accounted for with the enum and union. It is also possible to receive
+ * multiple params for a single key. We delineate the different params
+ * belonging to a key by using the is_last member. For example
+ * permessage-default;client_max_window_bit;server_max_window_bit,
+ * permessage-default will have the server_max_window_bit param is_last's
+ * member set to true, while that of client_max_window_bit is_last member set
+ * to false.
+*/
+typedef struct extension_param ExtensionParam;
+
+struct extension_param {
+    char key[EXTENSION_TOKEN_LENGTH + 1];
+    ValueType value_type;
+    union {
+        int64_t int_type;
+        bool bool_type;
+        char string_type[EXTENSION_TOKEN_LENGTH + 1];
+    };
+    bool is_last;
+    ExtensionParam *next;
+};
+
+/**
+ * Defines an extension list. This list will have a token that identifies the
+ * extension to use. The params identifies the options that are set by the
+ * client. 
+*/
 typedef struct extension_list ExtensionList;
 
 struct extension_list {
+    char token[EXTENSION_TOKEN_LENGTH + 1];
     ExtensionList *next;
-    char key[EXTENSION_KEY_LENGTH];
-    char value[EXTENSION_VALUE_LENGTH];
+    ExtensionParam *params;
 };
 
 typedef struct waiting_clients WaitingClient;
 
 struct waiting_clients {
-    WaitingClient *next;
     int socketfd;
+    WaitingClient *next;
     ExtensionList *extensions;
 };
 
@@ -117,8 +152,10 @@ void delete_extensions(int socketfd);
  * @param list List of extension tokens
  * @param key Extension token list
  * @param create Determines if an extension token is created if not found.
+ * 
+ * @returns params
 */
-char* get_extension_params(ExtensionList *list, char *key, bool create);
+ExtensionParam* get_extension_params(ExtensionList *list, char *key, bool create);
 
 void print_list(ExtensionList *list);
 #endif

@@ -4,31 +4,41 @@
 
 #include "extension.h"
 
-void register_extension(char *key, bool (*parse_offer)(int,char*,uint16_t),
+void register_extension(char *key, bool (*validate_offer)(int,ExtensionParam*),
                            uint16_t (*respond_to_offer)(int,char*),
-                           bool (*validate_rsv)(int,bool,bool,bool),
-                           bool (*process_data)(int,char*,int,char**,int*),
+                           bool (*process_data)(int,Frame*,int,char**,int*),
                            void (*close)(int)
                         ) {
     if ( extension_table == NULL ) {
         extension_table = (Extension *)malloc(sizeof(Extension));
         extension_table[0].key = strdup(key);
-        extension_table[0].parse_offer = parse_offer;
+        extension_table[0].validate_offer = validate_offer;
         extension_table[0].respond_to_offer = respond_to_offer;
-        extension_table[0].validate_rsv = validate_rsv;
         extension_table[0].process_data = process_data;
         extension_table[0].close = close;
+        extension_count = 1;
     }
     else {
         extension_table = (Extension *)realloc(extension_table, sizeof(Extension)*(extension_count+1));
         extension_table[extension_count].key = strdup(key);
-        extension_table[extension_count].parse_offer = parse_offer;
+        extension_table[extension_count].validate_offer = validate_offer;
         extension_table[extension_count].respond_to_offer = respond_to_offer;
-        extension_table[extension_count].validate_rsv = validate_rsv;
         extension_table[extension_count].process_data = process_data;
         extension_table[extension_count].close = close;
         extension_count++;
     }
+}
+
+int16_t find_extension_functions(char *key) {
+    if ( extension_count == 0 ) {
+        return -1;
+    }
+    for ( int8_t i = 0; i < extension_count; i++ ) {
+        if ( strcmp(key, extension_table[i].key) == 0 ) {
+            return i;
+        }
+    }
+    return -1;
 }
 
 
@@ -57,7 +67,7 @@ ExtensionList *get_extension_list(int socketfd) {
 }
 
 
-void delete_extensions(int socketfd) {
+void delete_extension_list(int socketfd) {
     int index;
     // We need both of these variables to delete from the linked list.
     WaitingClient *prev, *current;
@@ -76,7 +86,7 @@ void delete_extensions(int socketfd) {
     if ( prev->socketfd == socketfd ) {
         current = prev;
         waiting_clients_table[index] = current->next;
-        free(prev->extensions);
+        free_extension_list(prev->extensions);
         free(prev);
         return;
     }
@@ -92,10 +102,74 @@ void delete_extensions(int socketfd) {
         current = current->next;
     }
     if ( current != NULL ) {
-        free(current->extensions);
+        free_extension_list(current->extensions);
         free(current);
     }
     return;
+}
+
+void free_extension_list(ExtensionList *list) {
+    ExtensionList *next;
+    ExtensionParam *current, *next_param;
+    while ( list != NULL ) {
+        next = list->next;
+        current = list->params;
+        while ( current != NULL ) {
+            next_param = current->next;
+            free(current);
+            current = next_param;
+        }
+        free(list);
+        list = next;
+    }
+}
+
+bool validate_extension_list(int socketfd, ExtensionList *list,
+                             uint8_t **extension_indices,
+                             uint8_t *indices_count) {
+    if ( list == NULL || strlen(list->token) == 0 || extension_count == 0 ) {
+        return true;
+    }
+    bool is_valid = true;
+    int16_t found;
+    uint8_t count = *indices_count;
+    uint8_t *indices = *extension_indices;
+    uint8_t size;
+    while ( list != NULL ) {
+        found = find_extension_functions(list->token);
+        if ( found == -1 ) {
+            list = list->next;
+            continue;
+        }
+        is_valid = extension_table[found].validate_offer(socketfd, list->params);
+        if ( !is_valid ) {
+            if ( indices != NULL ) {
+                free(indices);
+            }
+            return false;
+        }
+        if ( indices == NULL ) {
+            indices = (uint8_t *) malloc(sizeof(uint8_t));
+            indices[count] = found;
+            size = 1;
+            count = 1;
+        }
+        else {
+            if ( count == size ) {
+                if ( size == 255 ) {
+                    break;
+                }
+                size *= 2;
+                indices = (uint8_t *) malloc(sizeof(uint8_t)*size);
+            }
+            indices[count] = found;
+            count++;
+        }
+        list = list->next;
+    }
+    *extension_indices = indices;
+    *indices_count = count;
+    return true;
 }
 
 ExtensionParam* get_extension_params(ExtensionList *list, char *key, bool create) {
@@ -132,7 +206,7 @@ ExtensionParam* get_extension_params(ExtensionList *list, char *key, bool create
 
 void print_list(ExtensionList *list) {
     ExtensionParam *param;
-    char truthy[] = "truth";
+    char truthy[] = "true";
     char falsy[] = "false";
     while ( list != NULL ) {
         printf("Key: %s\n", list->token);

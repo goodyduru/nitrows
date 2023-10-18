@@ -3,7 +3,8 @@
 
 #include "./clients.h"
 
-Client *init_client(int socketfd) {
+Client *init_client(int socketfd, uint8_t *extension_indices,
+                    uint8_t indices_count) {
     int index; // Position of client in hashtable.
     // This is what is actually stored in the table. It contains the client too
     Node *node; 
@@ -17,6 +18,8 @@ Client *init_client(int socketfd) {
 
     // Initialize the client with some of its members default values.
     client->socketfd = socketfd;
+    client->indices_count = indices_count;
+    client->extension_indices = extension_indices;
     client->status = CONNECTED;
     
     // We are going to use socketfd as the hashtable key

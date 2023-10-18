@@ -99,15 +99,16 @@ int16_t parse_extensions(int socketfd, char *start, ExtensionList *extension_lis
  * @param subprotocol Contains the first protocol from the request's
  * Sec-Websocket-Protocol values. Can be empty
  * @param subprotocol_len Subprotocol string length. 0 if subprotocol is empty
- * @param extension Contains the first protocol from the request's
- * Sec-Websocket-Extensions values. Can be empty
- * @param extension_len Extension string length. 0 if extension is empty
+ * @param extension_indices Pointer to the pointer of each index of the
+ * extensions needed by the client. It is meant to be modified
+ * @param indices_count Pointer to the length of the indices array. It is meant
+ * to be modified.
  * 
  * @returns bool true if response is successfully sent, false otherwise
  * 
 */
 bool validate_headers(char buf[], int socketfd, char key[], char subprotocol[],
-                      int subprotocol_len, char extension[],
-                      int extension_len);
+                      int subprotocol_len, uint8_t **extension_indices,
+                      uint8_t *indices_count);
 
 #endif

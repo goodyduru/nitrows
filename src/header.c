@@ -155,7 +155,7 @@ int16_t parse_extensions(int socketfd, char *line,
                 return -1;
             }
             strncpy(key, start, length);
-            key[EXTENSION_TOKEN_LENGTH] = '\0';
+            key[length] = '\0';
             start = NULL;
             length = 0;
             current_params = get_extension_params(extension_list, key, true);
@@ -242,7 +242,7 @@ int16_t parse_extensions(int socketfd, char *line,
     }
     if ( !has_extension ) {
         strncpy(key, start, length);
-        key[EXTENSION_TOKEN_LENGTH] = '\0';
+        key[length] = '\0';
         current_params = get_extension_params(extension_list, key, true);
         while ( current_params != NULL && current_params->value_type != EMPTY ) {
             prev_params = current_params;
@@ -290,8 +290,8 @@ int16_t parse_extensions(int socketfd, char *line,
 }
 
 bool validate_headers(char buf[], int socketfd, char key[], char subprotocol[],
-                      int subprotocol_len, char extension[],
-                      int extension_len) {
+                      int subprotocol_len, uint8_t **extension_indices,
+                      uint8_t *indices_count) {
     char *p;
     int8_t index;
     int16_t progress;
@@ -369,5 +369,9 @@ bool validate_headers(char buf[], int socketfd, char key[], char subprotocol[],
         }
         index++;
     }
-    return true;
+
+    bool is_valid = validate_extension_list(socketfd, list, extension_indices,
+                                            indices_count);
+    delete_extension_list(socketfd);
+    return is_valid;
 }

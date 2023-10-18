@@ -58,6 +58,13 @@ typedef struct Client Client;
  */
 struct Client {
     int socketfd; // client socket descriptor
+
+    // Number of extensions supported for this client
+    uint8_t indices_count; 
+
+    // Array of each supported extension index in the extension table.
+    uint8_t *extension_indices;
+
     Connection_status status;
 
     // It is possible for the header of a frame to be in 2 different network 
@@ -105,9 +112,13 @@ Node *clients_table[HASHTABLE_SIZE];
  * Initialize a websocket client structure and add it to the client table.
  *
  * @param socketfd  Client socket descriptor
+ * @param extension_indices Array of extension indexes for reference in the
+ * array.
+ * @param extension_count Number of extension indexes in the array.
  * @return created client struct
  */
-Client *init_client(int socketfd);  
+Client *init_client(int socketfd, uint8_t *extension_indices,
+                    uint8_t indices_count);  
 
 /**
  * Get a websocket client from the client table.

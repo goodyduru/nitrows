@@ -56,12 +56,13 @@ void handle_upgrade(int socketfd) {
     char buf[BUFFER_SIZE]; // Buffer that holds request
     char key[60]; // Buffer that holds sec-websocket-accept value
     char subprotocol[100];
-    char extension[100];
-    int subprotocol_len, extension_len;
+    uint8_t *extension_indices, indices_count;
+    int subprotocol_len;
     bool is_valid;
     nbytes = recv(socketfd, buf, BUFFER_SIZE, 0);
     subprotocol_len = 0;
-    extension_len = 0;
+    indices_count = 0;
+    extension_indices = NULL;
 
     // Close connection if there's an error or client closes connection.
     if ( nbytes <= 0 ) {
@@ -82,24 +83,25 @@ void handle_upgrade(int socketfd) {
     }
 
     if ( (is_valid = validate_headers(buf, socketfd, key, subprotocol,
-                                        subprotocol_len, extension,
-                                        extension_len)) == false ) {
+                                        subprotocol_len, &extension_indices,
+                                        &indices_count)) == false ) {
         return;
     }
 
     bool sent = __send_upgrade_response(socketfd, key, subprotocol,
-                                        subprotocol_len, extension,
-                                        extension_len);
+                                        subprotocol_len, extension_indices,
+                                        indices_count);
     if ( sent == true ) {
-        init_client(socketfd);
+        init_client(socketfd, extension_indices, indices_count);
     }
 }
 
 bool __send_upgrade_response(int socketfd, char key[], char subprotocol[],
-                            int subprotocol_len, char extension[],
-                            int extension_len) {
-    int length;
-    char response[512];
+                            int subprotocol_len, uint8_t extension_indices[],
+                            uint8_t indices_count) {
+    uint16_t ext_response_length, length;
+    char response[4096];
+    char ext_response[512];
     unsigned char base64[29];
     char sha1[20];
     // Create `Sec-WebSocket-Accept` value
@@ -110,12 +112,26 @@ bool __send_upgrade_response(int socketfd, char key[], char subprotocol[],
 
     // Format response based on the presence of subprotocols
     if ( subprotocol_len > 0 ) {
-        length = sprintf(response, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\nSec-WebSocket-Protocol: %s\r\n\r\n", base64, subprotocol);
+        length = sprintf(response, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\nSec-WebSocket-Protocol: %s\r\n", base64, subprotocol);
     }
     else {
-        length = sprintf(response, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\n\r\n", base64);
+        length = sprintf(response, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\n", base64);
     }
-    response[length] = '\0';
+    if ( indices_count > 0 ) {
+        for ( uint8_t i = 0; i < indices_count && length < 4094; i++ ) {
+            ext_response_length = extension_table[i].respond_to_offer(socketfd, ext_response);
+            if ( ext_response_length > 512 ) {
+                continue;
+            }
+            else if ( (ext_response_length + length) > 4066  ) {
+                continue;
+            }
+            length += sprintf(response+length, "Sec-Websocket-Extensions: %s\r\n", ext_response);
+        }
+    }
+    response[length++] = '\r';
+    response[length++] = '\n';
+    
     int sent = send(socketfd, response, length, 0);
     if ( sent == -1 ) {
         perror("send");

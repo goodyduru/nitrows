@@ -9,6 +9,7 @@ PRODUCT = nitrows
 # What we're building with
 CXX = clang
 CXXFLAGS = -std=gnu99 -Wall -g -O0 -gdwarf-3
+LDFLAGS = -lz
 # By default, make the product.
 all:		$(PRODUCT)
 

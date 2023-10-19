@@ -89,13 +89,12 @@ struct Extension {
     // valid, false otherwise. It accepts a socket descriptor, a frame array,
     // length of frame array a pointer to the processed data, a pointer to the
     // length of the processed data.
-    bool (*process_data)(int,Frame*,int,char**,int*);
+    bool (*process_data)(int,Frame*,int,uint8_t**,uint64_t*);
 
-    // Generates data to be sent to client. Returns true if valid, false
-    // otherwise. It accepts a socket descriptor, the raw data to be sent, the
-    // length of the raw data, a pointer to the generated data, a pointer to
-    // the length of the generated data.
-    bool (*generate_data)(int,char*,int,char**,int*);
+    // Generates data to be sent to client. It accepts a socket descriptor, the
+    // raw data to be sent, the length of the raw data, a pointer to the
+    // output frame, returns the length of data written.
+    uint64_t (*generate_data)(int,uint8_t*,uint64_t,Frame* output_frame);
 
     // Closes and releases all resources associated with a particular socket
     // descriptor.
@@ -119,7 +118,8 @@ int8_t extension_count;
 */
 void register_extension(char *key, bool (*validate_offer)(int,ExtensionParam*),
                            uint16_t (*respond_to_offer)(int,char*),
-                           bool (*process_data)(int,Frame*,int,char**,int*),
+                           bool (*process_data)(int,Frame*,int,uint8_t**,uint64_t*),
+                           uint64_t (*generate_data)(int,uint8_t*,uint64_t,Frame *),
                            void (*close)(int)
                         );
 

@@ -4,6 +4,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "extension.h"
 #include "frame.h"
 #include "utf8.h"
 #include "server.h"
@@ -84,7 +85,10 @@ bool get_frame_type(Client *client, unsigned char byte) {
     bool rsv1 = (byte & 64) >> 6;
     bool rsv2 = (byte & 32) >> 5;
     bool rsv3 = (byte & 16) >> 4;
-    bool valid_rsv_bits = are_rsv_bits_valid(rsv1, rsv2, rsv3);
+    bool valid_rsv_bits = true;
+    if ( client->indices_count == 0 ) {
+        valid_rsv_bits = are_rsv_bits_valid(rsv1, rsv2, rsv3);
+    }
 
     // If our rsvs are invalid, then send a close frame and -1
     if ( valid_rsv_bits == false ) {
@@ -407,8 +411,8 @@ int64_t handle_data_frame(Client *client, unsigned char buf[], int size) {
 
     
     if ( frame->is_final ) {
-        if ( client->data_frames->type == TEXT ) {
-            bool is_valid;
+        bool is_valid;
+        if ( client->data_frames->type == TEXT && client->indices_count == 0 ) {
             if ( data == buf ) {
                 is_valid = validate_utf8((char *)data, frame->payload_size);
             }
@@ -418,6 +422,24 @@ int64_t handle_data_frame(Client *client, unsigned char buf[], int size) {
             if ( !is_valid ) {
                 send_close_status(client, INVALID_ENCODING);
                 return -1;
+            }
+        } else if ( client->indices_count > 0 ) {
+            uint8_t *output = NULL;
+            uint64_t output_length = 0;
+            for ( uint8_t i = 0; i < client->indices_count; i++ ) {
+                is_valid = extension_table[i].process_data(client->socketfd, client->data_frames, client->frame_count, &output, &output_length);
+                if ( !is_valid ) {
+                    send_close_status(client, INVALID_EXTENSION);
+                    return -1;
+                }
+                if ( output_length > 0 ) {
+                    free(client->data_frames[0].buffer);
+                    client->data_frames[0].buffer = output;
+                    client->data_frames[0].payload_size = output_length;
+                    client->frame_count = 1;
+                    output = NULL;
+                    output_length = 0;
+                }
             }
         }
         if ( data != buf ) {
@@ -535,6 +557,13 @@ bool send_data_frame(Client *client, unsigned char *message) {
     }
     else {
         size = client->buffer_size;
+    }
+    for ( uint8_t i = 0; i < client->indices_count; i++ ) {
+        size = extension_table[i].generate_data(client->socketfd, client->shared_buffer, size, client->current_frame);
+        if ( size == 0 ) {
+            send_close_status(client, INVALID_EXTENSION);
+            return -1;
+        }
     }
     first_byte = 128;
     first_byte |= client->data_frames[0].type;

@@ -6,7 +6,8 @@
 
 void register_extension(char *key, bool (*validate_offer)(int,ExtensionParam*),
                            uint16_t (*respond_to_offer)(int,char*),
-                           bool (*process_data)(int,Frame*,int,char**,int*),
+                           bool (*process_data)(int,Frame*,int,uint8_t**,uint64_t*),
+                           uint64_t (*generate_data)(int,uint8_t*,uint64_t,Frame*),
                            void (*close)(int)
                         ) {
     if ( extension_table == NULL ) {
@@ -15,6 +16,7 @@ void register_extension(char *key, bool (*validate_offer)(int,ExtensionParam*),
         extension_table[0].validate_offer = validate_offer;
         extension_table[0].respond_to_offer = respond_to_offer;
         extension_table[0].process_data = process_data;
+        extension_table[0].generate_data = generate_data;
         extension_table[0].close = close;
         extension_count = 1;
     }
@@ -24,6 +26,7 @@ void register_extension(char *key, bool (*validate_offer)(int,ExtensionParam*),
         extension_table[extension_count].validate_offer = validate_offer;
         extension_table[extension_count].respond_to_offer = respond_to_offer;
         extension_table[extension_count].process_data = process_data;
+        extension_table[extension_count].generate_data = generate_data;
         extension_table[extension_count].close = close;
         extension_count++;
     }

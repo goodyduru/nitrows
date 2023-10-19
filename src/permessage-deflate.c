@@ -25,6 +25,14 @@ void pmd_delete_from_table(int socketfd) {
     while ( config != NULL ) {
         if ( config->socketfd == socketfd ) {
             prev->next = config->next;
+            if ( config->inflater != NULL ) {
+                (void)inflateEnd(config->inflater);
+                free(config->inflater);
+            }
+            if ( config->deflater != NULL ) {
+                (void)deflateEnd(config->deflater);
+                free(config->deflater);
+            }
             free(config);
             break;
         }
@@ -163,6 +171,138 @@ uint16_t pmd_respond(int socketfd, char *response) {
     }
     response[length] = '\0';
     return length;
+}
+
+bool pmd_process_data(int socketfd, Frame* frames, int frame_count,
+                        uint8_t **output, uint64_t *output_length) {
+    if ( frames[0].rsv1 == 0 ) {
+        return true;
+    }
+    PMDClientConfig *config = pmd_get_from_table(socketfd);
+    if ( config == NULL ) {
+        return false;
+    }
+    int ret;
+    if ( config->inflater == NULL ) {
+        config->inflater = (z_stream *) malloc(sizeof(z_stream));
+        config->inflater->zalloc = Z_NULL;
+        config->inflater->zfree = Z_NULL;
+        config->inflater->opaque = Z_NULL;
+        config->inflater->avail_in = 0;
+        config->inflater->next_in = Z_NULL;
+        ret = inflateInit2(config->inflater, config->client_max_window_bits);
+        if ( ret != Z_OK )
+            return false;
+    }
+    z_stream *inflater = config->inflater;
+    uint8_t *out = *output;
+    uint64_t length = *output_length;
+    uint64_t input_size = 0;
+    uint64_t written = 0;
+    for ( int i = 0; i < frame_count; i++ ) {
+        input_size += frames[i].payload_size;
+    }
+
+    if ( input_size == 0 ) {
+        return true;
+    }
+
+    inflater->avail_in = input_size;
+    inflater->next_in = frames[0].buffer;
+    do {
+        if ( out == NULL ) {
+            // typically output is at least twice the size of input.
+            length = 2*input_size; 
+            out = malloc(length); 
+        }
+        else {
+            length *= 2;
+            out = realloc(out, length);
+        }
+        inflater->avail_out = length - written;
+        inflater->next_out = out+written;
+        ret = inflate(inflater, Z_NO_FLUSH);
+        written = length - inflater->avail_out;
+        if ( ret == Z_STREAM_END ) {
+            if ( inflater->avail_out < 64 ) {
+                length += 64; // This should be more than enough
+                out = realloc(out, length);
+            }
+            inflater->avail_out = length - written;
+            inflater->next_out = out+written;
+            inflater->avail_in = 4; // trailer bytes
+            inflater->next_in = (uint8_t *) TRAILER;
+            ret = inflate(inflater, Z_NO_FLUSH);
+            if ( ret != Z_STREAM_END ) {
+                return false;
+            }
+            written = length - inflater->avail_out;
+        } else {
+            return false;
+        }
+    } while ( inflater->avail_out == 0 );
+
+    if ( config->client_no_context_takeover ) {
+        inflateReset(inflater);
+    }
+    *output = out;
+    *output_length = written;
+    return true;
+}
+
+uint64_t pmd_generate_response(int socketfd, uint8_t* input, uint64_t input_length,
+                                Frame* output_frame) {
+    PMDClientConfig *config = pmd_get_from_table(socketfd);
+    if ( config == NULL ) {
+        return 0;
+    }
+    int ret;
+    if ( config->deflater == NULL ) {
+        config->deflater = (z_stream *) malloc(sizeof(z_stream));
+        config->deflater->zalloc = Z_NULL;
+        config->deflater->zfree = Z_NULL;
+        config->deflater->opaque = Z_NULL;
+        ret = deflateInit2(config->inflater, Z_DEFAULT_COMPRESSION, 
+        Z_DEFLATED, config->server_max_window_bits, 8, Z_DEFAULT_STRATEGY);
+        if ( ret != Z_OK )
+            return 0;
+    }
+    z_stream *deflater = config->deflater;
+    uint64_t written = 0;
+    uint8_t *out = NULL;
+    uint64_t length;
+
+    deflater->avail_in = input_length;
+    deflater->next_in = input;
+    do {
+        if ( out == NULL ) {
+            // typically output is at least twice the size of input.
+            length = input_length/2; 
+            out = malloc(length); 
+        }
+        else {
+            length *= 2;
+            out = realloc(out, length);
+        }
+        deflater->avail_out = length - written;
+        deflater->next_out = out+written;
+        ret = deflate(deflater, Z_NO_FLUSH);
+        written = length - deflater->avail_out;
+        if ( ret == Z_STREAM_END ) {
+            written = length - deflater->avail_out;
+        } else {
+            return 0;
+        }
+    } while ( deflater->avail_out == 0 );
+
+    if ( config->server_no_context_takeover ) {
+        deflateReset(deflater);
+    }
+    output_frame->buffer = out;
+    output_frame->buffer_size = written;
+    output_frame->payload_size = written;
+    output_frame->rsv1 = true;
+    return written;
 }
 
 void pmd_close(int socketfd) {

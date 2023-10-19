@@ -21,17 +21,18 @@
 */
 void nitrows_register_extension(char *key, bool (*validate_offer)(int,ExtensionParam*),
                            uint16_t (*respond_to_offer)(int,char*),
-                           bool (*process_data)(int,Frame*,int,char**,int*),
+                           bool (*process_data)(int,Frame*,int,uint8_t**,uint64_t*),
+                           uint64_t (*generate_data)(int,uint8_t*,uint64_t,Frame*),
                            void (*close)(int)
                         ) {
     register_extension(key, validate_offer, respond_to_offer, process_data,
-                        close);
+                       generate_data, close);
 }
 
 int main(){
     extension_table = NULL;
     nitrows_register_extension("permessage-deflate", pmd_validate_offer,
-                                pmd_respond, NULL, pmd_close);
+                                pmd_respond, pmd_process_data, pmd_generate_response, pmd_close);
     int listener_socket = get_listener_socket();
     init_event_loop();
     add_to_event_loop(listener_socket);

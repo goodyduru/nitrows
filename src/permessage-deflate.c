@@ -190,7 +190,7 @@ bool pmd_process_data(int socketfd, Frame* frames, int frame_count,
         config->inflater->opaque = Z_NULL;
         config->inflater->avail_in = 0;
         config->inflater->next_in = Z_NULL;
-        ret = inflateInit2(config->inflater, config->client_max_window_bits);
+        ret = inflateInit2(config->inflater, -config->client_max_window_bits);
         if ( ret != Z_OK )
             return false;
     }
@@ -222,10 +222,12 @@ bool pmd_process_data(int socketfd, Frame* frames, int frame_count,
         inflater->avail_out = length - written;
         inflater->next_out = out+written;
         ret = inflate(inflater, Z_NO_FLUSH);
+        printf("%llu, %llu, %u\n", length, written, inflater->avail_out);
         written = length - inflater->avail_out;
-        if ( ret == Z_STREAM_END ) {
-            if ( inflater->avail_out < 64 ) {
-                length += 64; // This should be more than enough
+        printf("Inflate ret: %d\n", ret);
+        if ( ret == Z_STREAM_END || (ret == Z_OK && inflater->avail_out > 0) ) {
+            if ( inflater->avail_out < 8 ) {
+                length += 8; // This should be more than enough
                 out = realloc(out, length);
             }
             inflater->avail_out = length - written;
@@ -233,11 +235,11 @@ bool pmd_process_data(int socketfd, Frame* frames, int frame_count,
             inflater->avail_in = 4; // trailer bytes
             inflater->next_in = (uint8_t *) TRAILER;
             ret = inflate(inflater, Z_NO_FLUSH);
-            if ( ret != Z_STREAM_END ) {
+            if ( ret != Z_STREAM_END && ret != Z_OK ) {
                 return false;
             }
             written = length - inflater->avail_out;
-        } else {
+        } else if ( ret != Z_OK ) {
             return false;
         }
     } while ( inflater->avail_out == 0 );
@@ -262,8 +264,8 @@ uint64_t pmd_generate_response(int socketfd, uint8_t* input, uint64_t input_leng
         config->deflater->zalloc = Z_NULL;
         config->deflater->zfree = Z_NULL;
         config->deflater->opaque = Z_NULL;
-        ret = deflateInit2(config->inflater, Z_DEFAULT_COMPRESSION, 
-        Z_DEFLATED, config->server_max_window_bits, 8, Z_DEFAULT_STRATEGY);
+        ret = deflateInit2(config->deflater, Z_DEFAULT_COMPRESSION, 
+        Z_DEFLATED, -config->server_max_window_bits, 8, Z_DEFAULT_STRATEGY);
         if ( ret != Z_OK )
             return 0;
     }
@@ -271,13 +273,12 @@ uint64_t pmd_generate_response(int socketfd, uint8_t* input, uint64_t input_leng
     uint64_t written = 0;
     uint8_t *out = NULL;
     uint64_t length;
-
     deflater->avail_in = input_length;
     deflater->next_in = input;
     do {
         if ( out == NULL ) {
             // typically output is at least twice the size of input.
-            length = input_length/2; 
+            length = input_length; 
             out = malloc(length); 
         }
         else {
@@ -286,23 +287,23 @@ uint64_t pmd_generate_response(int socketfd, uint8_t* input, uint64_t input_leng
         }
         deflater->avail_out = length - written;
         deflater->next_out = out+written;
-        ret = deflate(deflater, Z_NO_FLUSH);
+        ret = deflate(deflater, Z_SYNC_FLUSH);
+        printf("Deflate ret: %d\n", ret);
         written = length - deflater->avail_out;
-        if ( ret == Z_STREAM_END ) {
-            written = length - deflater->avail_out;
-        } else {
+        printf("Deflate numbers: %llu, %llu, %u\n", length, written, deflater->avail_out);
+        if ( ret != Z_OK && ret != Z_STREAM_END ) {
+            printf("Error %d\n", ret);
             return 0;
         }
     } while ( deflater->avail_out == 0 );
-
     if ( config->server_no_context_takeover ) {
         deflateReset(deflater);
     }
     output_frame->buffer = out;
-    output_frame->buffer_size = written;
-    output_frame->payload_size = written;
+    output_frame->buffer_size = written - 4; // Remove trailing bits
+    output_frame->payload_size = written - 4; // Remove trailing bits
     output_frame->rsv1 = true;
-    return written;
+    return written - 4;
 }
 
 void pmd_close(int socketfd) {

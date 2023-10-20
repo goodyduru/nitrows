@@ -304,7 +304,6 @@ bool validate_headers(char buf[], int socketfd, char key[], char subprotocol[],
     p = buf;
     request_length = strlen(buf);
     ExtensionList *list = get_extension_list(socketfd);
-
     while ( *p != '\0' && (p - buf) < request_length && 
             *p != '\r' && *p != '\n' ) {
         for ( index = 0; index < header_count && (p - buf) < request_length; index++ ) {

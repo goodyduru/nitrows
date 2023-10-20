@@ -411,7 +411,7 @@ int64_t handle_data_frame(Client *client, unsigned char buf[], int size) {
 
     
     if ( frame->is_final ) {
-        bool is_valid;
+        bool is_valid, was_written = false;
         if ( client->data_frames->type == TEXT && client->indices_count == 0 ) {
             if ( data == buf ) {
                 is_valid = validate_utf8((char *)data, frame->payload_size);
@@ -426,24 +426,32 @@ int64_t handle_data_frame(Client *client, unsigned char buf[], int size) {
         } else if ( client->indices_count > 0 ) {
             uint8_t *output = NULL;
             uint64_t output_length = 0;
+            if ( data == buf ) {
+                client->data_frames[0].buffer = data;
+            }
             for ( uint8_t i = 0; i < client->indices_count; i++ ) {
-                is_valid = extension_table[i].process_data(client->socketfd, client->data_frames, client->frame_count, &output, &output_length);
+                is_valid = extension_table[client->extension_indices[i]].process_data(client->socketfd, client->data_frames, client->frame_count, &output, &output_length);
                 if ( !is_valid ) {
                     send_close_status(client, INVALID_EXTENSION);
                     return -1;
                 }
                 if ( output_length > 0 ) {
-                    free(client->data_frames[0].buffer);
+                    was_written = true;
+                    if ( data != buf )
+                        free(client->data_frames[0].buffer);
                     client->data_frames[0].buffer = output;
                     client->data_frames[0].payload_size = output_length;
+                    client->buffer_size = output_length;
                     client->frame_count = 1;
                     output = NULL;
                     output_length = 0;
                 }
             }
         }
-        if ( data != buf ) {
+        if ( data != buf && !was_written ) {
             data = client->shared_buffer;
+        } else if ( was_written ) {
+            data = client->data_frames[0].buffer;
         }
         bool is_sent = send_data_frame(client, data);
         if ( !is_sent ) return -1;
@@ -558,14 +566,18 @@ bool send_data_frame(Client *client, unsigned char *message) {
     else {
         size = client->buffer_size;
     }
+    first_byte = 128;
     for ( uint8_t i = 0; i < client->indices_count; i++ ) {
-        size = extension_table[i].generate_data(client->socketfd, client->shared_buffer, size, client->current_frame);
+        size = extension_table[client->extension_indices[i]].generate_data(client->socketfd, message, size, client->current_frame);
+        message = client->current_frame->buffer;
         if ( size == 0 ) {
             send_close_status(client, INVALID_EXTENSION);
             return -1;
         }
+        first_byte |= (client->current_frame->rsv1 << 6);
+        first_byte |= (client->current_frame->rsv2 << 5);
+        first_byte |= (client->current_frame->rsv3 << 4);
     }
-    first_byte = 128;
     first_byte |= client->data_frames[0].type;
     payload_size = 0;
     size_length = 0;

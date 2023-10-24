@@ -199,11 +199,12 @@ bool pmd_process_data(int socketfd, Frame* frame, uint8_t **output,
     uint64_t length = *output_length;
     uint64_t input_size = 0;
     uint64_t written = 0;
-    input_size = frame->buffer_size;
+    input_size = frame->filled_size;
 
     if ( input_size == 0 ) {
         return true;
     }
+    printf("Frame payload size: %llu\n", frame->payload_size);
     printf("Payload size: %llu\n", input_size);
     inflater->avail_in = input_size;
     inflater->next_in = frame->buffer;

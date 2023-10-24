@@ -333,6 +333,7 @@ int64_t handle_data_frame(Client *client, unsigned char buf[], int size) {
         read += to_copy_size;
     }
     uint64_t current_frame_size = frame->filled_size - frame->current_fragment_offset;
+    print_client(client);
     // Unmask data with current mask data if end of the current frame payload
     // has been reached.
     if ( data == buf || current_frame_size == frame->payload_size ) {
@@ -363,6 +364,7 @@ int64_t handle_data_frame(Client *client, unsigned char buf[], int size) {
             if ( data == buf ) {
                 frame->buffer = data;
                 frame->buffer_size = frame->payload_size;
+                frame->filled_size = frame->payload_size;
             }
             for ( uint8_t i = 0; i < client->indices_count; i++ ) {
                 is_valid = extension_table[client->extension_indices[i]].process_data(client->socketfd, frame, &output, &output_length);
@@ -371,7 +373,7 @@ int64_t handle_data_frame(Client *client, unsigned char buf[], int size) {
                     return -1;
                 }
                 if ( output_length > 0 ) {
-                    if ( frame->buffer != buf ) {
+                    if ( frame->buffer != buf && frame->buffer != NULL ) {
                         free(frame->buffer);
                     }
                     was_written = true;
@@ -408,7 +410,8 @@ int64_t handle_data_frame(Client *client, unsigned char buf[], int size) {
     frame->is_first = false;
     frame->payload_size = 0;
     frame->type = INVALID;
-    if ( frame->buffer_size > 0 ) {
+    frame->current_fragment_offset = 0;
+    if ( frame->buffer_size > 0 && data != buf ) {
         frame->buffer_size = 0;
         frame->filled_size = 0;
         free(frame->buffer);
@@ -547,5 +550,12 @@ bool send_data_frame(Client *client, unsigned char *message) {
     memcpy(final_frame+size_length+2, message, size);
     bool is_sent =  send_frame(client, final_frame, size+size_length+2);
     free(final_frame);
+    if ( client->output_frame.buffer != NULL ) {
+        free(client->output_frame.buffer);
+        client->output_frame.buffer_size = 0;
+        client->output_frame.payload_size = 0;
+        client->output_frame.rsv1 = false;
+        client->output_frame.buffer = NULL;
+    }
     return is_sent;
 }

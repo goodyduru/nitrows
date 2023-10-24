@@ -21,7 +21,7 @@
 */
 void nitrows_register_extension(char *key, bool (*validate_offer)(int,ExtensionParam*),
                            uint16_t (*respond_to_offer)(int,char*),
-                           bool (*process_data)(int,Frame*,int,uint8_t**,uint64_t*),
+                           bool (*process_data)(int,Frame*,uint8_t**,uint64_t*),
                            uint64_t (*generate_data)(int,uint8_t*,uint64_t,Frame*),
                            void (*close)(int)
                         ) {

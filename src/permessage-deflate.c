@@ -173,9 +173,9 @@ uint16_t pmd_respond(int socketfd, char *response) {
     return length;
 }
 
-bool pmd_process_data(int socketfd, Frame* frames, int frame_count,
-                        uint8_t **output, uint64_t *output_length) {
-    if ( frames[0].rsv1 == 0 ) {
+bool pmd_process_data(int socketfd, Frame* frame, uint8_t **output,
+                        uint64_t *output_length) {
+    if ( frame->rsv1 == 0 ) {
         return true;
     }
     PMDClientConfig *config = pmd_get_from_table(socketfd);
@@ -199,16 +199,14 @@ bool pmd_process_data(int socketfd, Frame* frames, int frame_count,
     uint64_t length = *output_length;
     uint64_t input_size = 0;
     uint64_t written = 0;
-    for ( int i = 0; i < frame_count; i++ ) {
-        input_size += frames[i].payload_size;
-    }
+    input_size = frame->buffer_size;
 
     if ( input_size == 0 ) {
         return true;
     }
-
+    printf("Payload size: %llu\n", input_size);
     inflater->avail_in = input_size;
-    inflater->next_in = frames[0].buffer;
+    inflater->next_in = frame->buffer;
     do {
         if ( out == NULL ) {
             // typically output is at least twice the size of input.
@@ -239,7 +237,7 @@ bool pmd_process_data(int socketfd, Frame* frames, int frame_count,
                 return false;
             }
             written = length - inflater->avail_out;
-        } else if ( ret != Z_OK ) {
+        } else if ( ret != Z_OK && ret != Z_BUF_ERROR ) {
             return false;
         }
     } while ( inflater->avail_out == 0 );
@@ -252,8 +250,8 @@ bool pmd_process_data(int socketfd, Frame* frames, int frame_count,
     return true;
 }
 
-uint64_t pmd_generate_response(int socketfd, uint8_t* input, uint64_t input_length,
-                                Frame* output_frame) {
+uint64_t pmd_generate_response(int socketfd, uint8_t* input,
+                                uint64_t input_length, Frame* output_frame) {
     PMDClientConfig *config = pmd_get_from_table(socketfd);
     if ( config == NULL ) {
         return 0;

@@ -6,6 +6,10 @@
 
 #include "./defs.h"
 
+#define NO_FRAME -1
+#define CONTROL_FRAME 0
+#define DATA_FRAME 1
+
 typedef struct Frame Frame;
 
 /**
@@ -24,23 +28,19 @@ struct Frame {
     bool rsv2;
     bool rsv3;
 
-    // A client can send a control frame singly or in the middle of a 
-    // fragmented data frame. This attribute determines if the frame is a 
-    // control frame or not.
-    bool is_control;
     Opcode type; // Frame type
     uint64_t payload_size; // Payload size for current payload
 
     // The payload of an incomplete or fragrmented data frame has to be stored
     // somewhere. These last 3 elements handle everything concerning this.
     // These values hold across multiple frames of fragmented data. The buffer
-    // array contains the data received so far. The buffer_size element
-    // determines the size of received data in the buffer array. For data
-    // frames, the buffer pointer points to a section of the shared buffer
-    // array that all data frames share. For control frames, the buffer is just 
-    // a buffer of size `payload_size`.
+    // array contains the data received so far. The filled_size element
+    // represents the amount of data in the buffer. The buffer_size element
+    // determines the size of the buffer array. 
+    uint64_t filled_size;
     uint64_t buffer_size;
-    unsigned char *buffer;
+    uint64_t current_fragment_offset; // Where current fragment starts
+    uint8_t *buffer;
 };
 
 typedef struct Client Client;
@@ -67,28 +67,26 @@ struct Client {
 
     Connection_status status;
 
+
     // It is possible for the header of a frame to be in 2 different network 
     // recv buffers. We need a place to store the header info in this scenario. 
     // The minimum header size is 5, so if a currently processed frame size in 
     // a buffer is less than this number, we store it in the `current_header` 
     // element and record the size in the `header_size` element.
     uint8_t header_size;
-    unsigned char current_header[9];
+    uint8_t current_header[9];
 
     // Frame mask for the currently processed frame.
     uint8_t mask_size;
-    unsigned char mask[4];
-    // Current frame that we are handling. Can be a data frame or a control 
-    // frame
-    Frame *current_frame;
+    uint8_t mask[4];
+    
+    // Type of current frame. Can be no frame if no current frame is processed
+    char current_frame_type;
 
-    uint32_t frame_size; // Data frame array size
-    uint32_t frame_count; // Number of frames in array
-    Frame *data_frames; // Array of frames, starting from the first frame.
-
-    uint64_t buffer_limit; // Buffer size
-    uint64_t buffer_size; // Amount of bytes in buffer
-    unsigned char *shared_buffer; // Buffer containing all data frame bytes
+    Frame control_frame;
+    Frame data_frame;
+    
+    Frame output_frame;
 };
 
 typedef struct Node Node;

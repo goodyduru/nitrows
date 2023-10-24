@@ -21,6 +21,13 @@ Client *init_client(int socketfd, uint8_t *extension_indices,
     client->indices_count = indices_count;
     client->extension_indices = extension_indices;
     client->status = CONNECTED;
+    client->current_frame_type = NO_FRAME;
+    client->data_frame.type = INVALID;
+    client->control_frame.type = INVALID;
+    // No control frame will occupy more than 125 bytes
+    client->control_frame.buffer_size = 125;
+    client->control_frame.buffer = malloc(125);
+
     
     // We are going to use socketfd as the hashtable key
     index = socketfd % HASHTABLE_SIZE;
@@ -97,14 +104,15 @@ void delete_client(Client *client) {
 }
 
 void __free_client(Client *client) {
-    if ( client->data_frames != NULL ) {
-        free(client->data_frames);
+    if ( client->data_frame.buffer != NULL ) {
+        free(client->data_frame.buffer);
     }
-    if ( client->current_frame != NULL && client->current_frame->is_control ) {
-        free(client->current_frame);
+    if ( client->control_frame.buffer != NULL ) {
+        free(client->control_frame.buffer);
     }
-    if ( client->shared_buffer != NULL )
-        free(client->shared_buffer);
+    if ( client->output_frame.buffer != NULL ) {
+        free(client->output_frame.buffer);
+    }
 
     free(client);
 }
@@ -113,20 +121,14 @@ void print_client(Client *client) {
     printf("Client info\n");
     printf("Socket: %d\n", client->socketfd);
     printf("Status: %d\n", client->status);
-    printf("Processing frame: %d\n", (client->current_frame != NULL));
+    printf("Processing frame: %d\n", (client->current_frame_type != NO_FRAME));
     printf("Header size: %d\n", client->header_size);
     printf("Mask size: %d\n", client->mask_size);
     printf("Mask: %x%x%x%x\n", client->mask[0], client->mask[1], client->mask[2], client->mask[3]);
-    if ( client->current_frame != NULL ) {
-        printf("Type: %d\n", client->current_frame->type);
-        printf("Data size: %llu\n", client->current_frame->payload_size);
-        printf("Buffer size: %llu\n", client->current_frame->buffer_size);
-        printf("Is final %d\n", client->current_frame->is_final);
-    }
-    if ( client->data_frames != NULL ) {
-        printf("Type: %d\n", client->data_frames[0].type);
-        printf("Data size: %llu\n", client->data_frames[0].payload_size);
-        printf("Buffer size: %llu\n", client->data_frames[0].buffer_size);
-        printf("Is final %d\n", client->data_frames[0].is_final);
-    }
+    printf("Control type: %d\n", client->control_frame.type);
+    printf("Control data size: %llu\n", client->control_frame.buffer_size);
+    printf("Data type: %d\n", client->data_frame.type);
+    printf("Current data frame start: %llu\n", client->data_frame.current_fragment_offset);
+    printf("Buffer size: %llu\n", client->data_frame.filled_size);
+    printf("Buffer max size: %llu\n", client->data_frame.buffer_size);
 }

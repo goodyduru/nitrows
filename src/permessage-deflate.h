@@ -33,8 +33,8 @@ PMDClientConfig *pmd_config_table[HASHTABLE_SIZE];
 bool pmd_validate_offer(int socketfd, ExtensionParam* param);
 uint16_t pmd_respond(int socketfd, char *response);
 bool pmd_validate_rsv(int socketfd, bool rsv1, bool rsv2, bool rsv3);
-bool pmd_process_data(int socketfd, Frame* frames, int frame_count,
-                        uint8_t **output, uint64_t *output_length);
+bool pmd_process_data(int socketfd, Frame* frame, uint8_t **output,
+                        uint64_t *output_length);
 uint64_t pmd_generate_response(int socketfd, uint8_t* input, uint64_t input_length,
                                 Frame* output_frame);
 void pmd_close(int socketfd);

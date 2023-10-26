@@ -333,7 +333,6 @@ int64_t handle_data_frame(Client *client, unsigned char buf[], int size) {
         read += to_copy_size;
     }
     uint64_t current_frame_size = frame->filled_size - frame->current_fragment_offset;
-    print_client(client);
     // Unmask data with current mask data if end of the current frame payload
     // has been reached.
     if ( data == buf || current_frame_size == frame->payload_size ) {

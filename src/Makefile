@@ -8,8 +8,21 @@ PRODUCT = nitrows
 
 # What we're building with
 CXX = clang
-CXXFLAGS = -std=gnu99 -Wall -g -O0 -gdwarf-3
+CFLAGS := -Wall -std=c99
+CFLAGS_DEBUG := -g -DDEBUG -O0
+CFLAGS_ASAN := -O1 -g -fsanitize=address
+CFLAGS_RELEASE := -O3
 LDFLAGS = -lz
+
+ifeq ($(DEBUG),1)
+  CFLAGS := $(CFLAGS_DEBUG) $(CFLAGS)
+else ifeq ($(ASAN),1)
+  CFLAGS := $(CFLAGS_ASAN) $(CFLAGS)
+  LDFLAGS := $(LDFLAGS) -fsanitize=address
+else
+  CFLAGS := $(CFLAGS_RELEASE) $(CFLAGS)
+endif
+
 # By default, make the product.
 all:		$(PRODUCT)
 
@@ -19,11 +32,11 @@ clean:
 
 # How to compile a C file
 %.o:		%.c $(HEADERS)
-	$(CXX) $(CXXFLAGS) -o 
+	$(CXX) $(CFLAGS) -o 
 
 # How to compile a C file
 %.o:		%.c $(HEADERS)
-	$(CXX) $(CXXFLAGS) $(EXTRA_CXXFLAGS) -o $@ -c $<
+	$(CXX) $(CFLAGS) $(EXTRA_CXXFLAGS) -o $@ -c $<
 
 # How to link the product
 $(PRODUCT):	$(PRODUCT_OBJECTS)

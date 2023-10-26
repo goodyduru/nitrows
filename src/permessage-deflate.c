@@ -204,8 +204,6 @@ bool pmd_process_data(int socketfd, Frame* frame, uint8_t **output,
     if ( input_size == 0 ) {
         return true;
     }
-    printf("Frame payload size: %llu\n", frame->payload_size);
-    printf("Payload size: %llu\n", input_size);
     inflater->avail_in = input_size;
     inflater->next_in = frame->buffer;
     do {
@@ -221,9 +219,7 @@ bool pmd_process_data(int socketfd, Frame* frame, uint8_t **output,
         inflater->avail_out = length - written;
         inflater->next_out = out+written;
         ret = inflate(inflater, Z_NO_FLUSH);
-        printf("%llu, %llu, %u\n", length, written, inflater->avail_out);
         written = length - inflater->avail_out;
-        printf("Inflate ret: %d\n", ret);
         if ( ret == Z_STREAM_END || (ret == Z_OK && inflater->avail_out > 0) ) {
             if ( inflater->avail_out < 8 ) {
                 length += 8; // This should be more than enough
@@ -287,11 +283,8 @@ uint64_t pmd_generate_response(int socketfd, uint8_t* input,
         deflater->avail_out = length - written;
         deflater->next_out = out+written;
         ret = deflate(deflater, Z_SYNC_FLUSH);
-        printf("Deflate ret: %d\n", ret);
         written = length - deflater->avail_out;
-        printf("Deflate numbers: %llu, %llu, %u\n", length, written, deflater->avail_out);
         if ( ret != Z_OK && ret != Z_STREAM_END ) {
-            printf("Error %d\n", ret);
             return 0;
         }
     } while ( deflater->avail_out == 0 );

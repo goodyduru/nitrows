@@ -15,7 +15,7 @@
  *
  * @returns amount of bytes read
 */
-int8_t extract_header_data(Client *client, unsigned char buf[], int size);
+int8_t extract_header_data(Client *client, uint8_t buf[], int size);
 
 /**
  * Get the current frame type and set in client struct.
@@ -25,7 +25,7 @@ int8_t extract_header_data(Client *client, unsigned char buf[], int size);
  * 
  * @returns true if first byte of header is valid, otherwise false
 */
-bool get_frame_type(Client *client, unsigned char byte);
+bool get_frame_type(Client *client, uint8_t byte);
 
 /**
  * Checks for the validity of the rsv bits
@@ -47,7 +47,7 @@ bool are_rsv_bits_valid(bool rsv1, bool rsv2, bool rsv3);
  * 
  * @returns amount of bytes read
 */
-int8_t get_payload_data(Client *client, unsigned char buf[], int size);
+int8_t get_payload_data(Client *client, uint8_t buf[], int size);
 
 /**
  * Handles the various types of control frames
@@ -58,7 +58,7 @@ int8_t get_payload_data(Client *client, unsigned char buf[], int size);
  * 
  * @returns amount of bytes read
 */
-int8_t handle_control_frame(Client *client, unsigned char buf[], int size);
+int8_t handle_control_frame(Client *client, uint8_t buf[], int size);
 
 /**
  * Handles the various types of data frames
@@ -69,7 +69,7 @@ int8_t handle_control_frame(Client *client, unsigned char buf[], int size);
  * 
  * @returns amount of bytes read
 */
-int64_t handle_data_frame(Client *client, unsigned char buf[], int size);
+int64_t handle_data_frame(Client *client, uint8_t buf[], int size);
 
 /**
  * Generates a reply code based on the status code.
@@ -95,7 +95,7 @@ void send_close_status(Client *client, Status_code code);
  * @param message Close message
  * @param size Message size
 */
-void send_close_frame(Client *client, unsigned char *message, uint8_t size);
+void send_close_frame(Client *client, uint8_t *message, uint8_t size);
 
 /**
  * Send pong frame
@@ -106,7 +106,7 @@ void send_close_frame(Client *client, unsigned char *message, uint8_t size);
  * 
  * @returns true if successful, else false
 */
-bool send_pong_frame(Client *client, unsigned char *message, uint8_t size);
+bool send_pong_frame(Client *client, uint8_t *message, uint8_t size);
 
 /**
  * Send ping frame
@@ -117,7 +117,7 @@ bool send_pong_frame(Client *client, unsigned char *message, uint8_t size);
  * 
  * @returns true if successful, else false
 */
-bool send_ping_frame(Client *client, unsigned char *message, uint8_t size);
+bool send_ping_frame(Client *client, uint8_t *message, uint8_t size);
 
 /**
  * Send data frame
@@ -127,5 +127,5 @@ bool send_ping_frame(Client *client, unsigned char *message, uint8_t size);
  * 
  * @returns true if successful, else false
 */
-bool send_data_frame(Client *client, unsigned char *message);
+bool send_data_frame(Client *client, uint8_t *message);
 #endif

@@ -289,20 +289,18 @@ int16_t parse_extensions(int socketfd, char *line,
     return p - line;
 }
 
-bool validate_headers(char buf[], int socketfd, char key[], char subprotocol[],
+bool validate_headers(char buf[], uint16_t request_length, int socketfd, char key[], char subprotocol[],
                       int subprotocol_len, uint8_t **extension_indices,
                       uint8_t *indices_count) {
     char *p;
     int8_t index;
     int16_t progress;
-    size_t request_length;
     char *headers[] = {"Host:", "Upgrade:", "Sec-Websocket-Key:",           
                        "Sec-Websocket-Version:", "Sec-Websocket-Protocol:", 
                        "Sec-Websocket-Extensions:"};
     int8_t header_count = 6;
     bool required_headers_present[] = {false, false, false, false}; // Store required headers check status here.
     p = buf;
-    request_length = strlen(buf);
     ExtensionList *list = get_extension_list(socketfd);
     while ( *p != '\0' && (p - buf) < request_length && 
             *p != '\r' && *p != '\n' ) {

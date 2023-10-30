@@ -9,7 +9,7 @@
 #include "utf8.h"
 #include "server.h"
 
-int8_t extract_header_data(Client *client, unsigned char buf[], int size) {
+int8_t extract_header_data(Client *client, uint8_t buf[], int size) {
     int8_t header_read, read;
     read = 0;
     header_read = 0;
@@ -44,7 +44,7 @@ int8_t extract_header_data(Client *client, unsigned char buf[], int size) {
     return header_read;
 }
 
-bool get_frame_type(Client *client, unsigned char byte) {
+bool get_frame_type(Client *client, uint8_t byte) {
     bool is_final_frame = ( byte > 127 );
     bool rsv1 = (byte & 64) >> 6;
     bool rsv2 = (byte & 32) >> 5;
@@ -102,7 +102,7 @@ bool are_rsv_bits_valid(bool rsv1, bool rsv2, bool rsv3) {
     return (!rsv1 && !rsv2 && !rsv3);
 }
 
-int8_t get_payload_data(Client *client, unsigned char buf[], int size) {
+int8_t get_payload_data(Client *client, uint8_t buf[], int size) {
     int8_t read = 0;
     if ( client->header_size == 0 ) {
         // Empty header size means we've not check the existence of mask.
@@ -194,7 +194,7 @@ int8_t get_payload_data(Client *client, unsigned char buf[], int size) {
 /**
  * Unmask data gotten from client with mask key.
  */
-void unmask(Client *client, unsigned char buf[], int size) {
+void unmask(Client *client, uint8_t buf[], int size) {
     for ( int i = 0; i < size; i++ ) {
         buf[i] ^= client->mask[i%4];
     }
@@ -207,7 +207,7 @@ void unmask(Client *client, unsigned char buf[], int size) {
  * the same valid status code that's processed. Empty close frame are sent for
  * invalid code.
  */
-void handle_close_frame(Client *client, unsigned char *data) {
+void handle_close_frame(Client *client, uint8_t *data) {
     uint64_t payload_size = client->control_frame.payload_size;
     if ( payload_size == 0 ) {
         send_close_status(client, NORMAL);
@@ -243,9 +243,9 @@ void handle_close_frame(Client *client, unsigned char *data) {
     send_close_frame(client, data, payload_size);
 }
 
-int8_t handle_control_frame(Client *client, unsigned char buf[], int size) {
+int8_t handle_control_frame(Client *client, uint8_t buf[], int size) {
     int8_t read = 0;
-    unsigned char *data;
+    uint8_t *data;
     Frame *frame = &client->control_frame;
 
     // Avoid unnecessary copies and allocations. We can use the buf directly.
@@ -292,9 +292,9 @@ int8_t handle_control_frame(Client *client, unsigned char buf[], int size) {
     return read;
 }
 
-int64_t handle_data_frame(Client *client, unsigned char buf[], int size) {
+int64_t handle_data_frame(Client *client, uint8_t buf[], int size) {
     int64_t read = 0;
-    unsigned char *data;
+    uint8_t *data;
     Frame *frame = &client->data_frame;
 
     // Avoid unnecessary copies and allocations. We can use the buf directly.
@@ -310,7 +310,7 @@ int64_t handle_data_frame(Client *client, unsigned char buf[], int size) {
     else {
         // Allocate or increase size if we don't have enough space
         if ( frame->buffer == NULL && frame->payload_size > 0 ) {
-            frame->buffer = (unsigned char *)malloc(frame->payload_size);
+            frame->buffer = (uint8_t *)malloc(frame->payload_size);
             frame->buffer_size = frame->payload_size;
         }
         else if ( (frame->buffer_size - frame->current_fragment_offset) <       
@@ -322,7 +322,7 @@ int64_t handle_data_frame(Client *client, unsigned char buf[], int size) {
             }
             frame->buffer_size += remaining_space;
             frame->buffer_size = (frame->buffer_size + BUFFER_SIZE - 1) & ~(BUFFER_SIZE - 1); // Round to a multiple of buffer size
-            frame->buffer = (unsigned char *)realloc(frame->buffer, frame->buffer_size);
+            frame->buffer = (uint8_t *)realloc(frame->buffer, frame->buffer_size);
         }
         data = frame->buffer;
         uint64_t to_copy_size = frame->payload_size - (frame->filled_size - frame->current_fragment_offset);
@@ -447,7 +447,7 @@ int16_t get_reply_code(uint16_t status_code) {
 }
 
 void send_close_status(Client *client, Status_code code) {
-    unsigned char statuses[2];
+    uint8_t statuses[2];
     if ( code > EMPTY_FRAME ) {
         uint16_t c = htons(code);
         memcpy(statuses, &c, 2);
@@ -455,9 +455,9 @@ void send_close_status(Client *client, Status_code code) {
     send_close_frame(client, statuses, (code == EMPTY_FRAME) ? 0 : 2);
 }
 
-void send_close_frame(Client *client, unsigned char *message, uint8_t size) {
-    unsigned char frame[size + 2], payload_size;
-    unsigned char first_byte;
+void send_close_frame(Client *client, uint8_t *message, uint8_t size) {
+    uint8_t frame[size + 2], payload_size;
+    uint8_t first_byte;
     first_byte = 128;
     first_byte |= CLOSE;
     payload_size = 0;
@@ -468,9 +468,9 @@ void send_close_frame(Client *client, unsigned char *message, uint8_t size) {
     send_frame(client, frame, size+2);
 }
 
-bool send_pong_frame(Client *client, unsigned char *message, uint8_t size) {
-    unsigned char frame[size + 2], payload_size;
-    unsigned char first_byte;
+bool send_pong_frame(Client *client, uint8_t *message, uint8_t size) {
+    uint8_t frame[size + 2], payload_size;
+    uint8_t first_byte;
     first_byte = 128;
     first_byte |= PONG;
     payload_size = 0;
@@ -481,9 +481,9 @@ bool send_pong_frame(Client *client, unsigned char *message, uint8_t size) {
     return send_frame(client, frame, size+2);
 }
 
-bool send_ping_frame(Client *client, unsigned char *message, uint8_t size) {
-    unsigned char frame[size + 2], payload_size;
-    unsigned char first_byte;
+bool send_ping_frame(Client *client, uint8_t *message, uint8_t size) {
+    uint8_t frame[size + 2], payload_size;
+    uint8_t first_byte;
     first_byte = 128;
     first_byte |= PING;
     payload_size = 0;
@@ -494,9 +494,9 @@ bool send_ping_frame(Client *client, unsigned char *message, uint8_t size) {
     return send_frame(client, frame, size+2);
 }
 
-bool send_data_frame(Client *client, unsigned char *message) {
-    unsigned char payload_size, size_length, *final_frame;
-    unsigned char first_byte;
+bool send_data_frame(Client *client, uint8_t *message) {
+    uint8_t payload_size, size_length, *final_frame;
+    uint8_t first_byte;
     uint64_t size, output_size;
     Frame *frame = &client->data_frame;
     if ( frame->buffer_size == 0 ) {
@@ -536,7 +536,7 @@ bool send_data_frame(Client *client, unsigned char *message) {
         payload_size |= 127;
         size_length = 8;
     }
-    final_frame = (unsigned char *) malloc(2 + size_length + size);
+    final_frame = (uint8_t *) malloc(2 + size_length + size);
     final_frame[0] = first_byte;
     final_frame[1] = payload_size;
     if ( size_length == 2 ) {

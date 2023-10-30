@@ -20,17 +20,17 @@ static char encoding_table[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
 static int mod_table[] = {0, 2, 1};
 
 
-void base64_encode(const unsigned char *data,
-                    unsigned char *encoded_data,
+void base64_encode(const uint8_t *data,
+                    uint8_t *encoded_data,
                     size_t input_length) {
 
     int output_length = 4 * ((input_length + 2) / 3);
 
     for (int i = 0, j = 0; i < input_length;) {
 
-        uint32_t octet_a = i < input_length ? (unsigned char)data[i++] : 0;
-        uint32_t octet_b = i < input_length ? (unsigned char)data[i++] : 0;
-        uint32_t octet_c = i < input_length ? (unsigned char)data[i++] : 0;
+        uint32_t octet_a = i < input_length ? (uint8_t)data[i++] : 0;
+        uint32_t octet_b = i < input_length ? (uint8_t)data[i++] : 0;
+        uint32_t octet_c = i < input_length ? (uint8_t)data[i++] : 0;
 
         uint32_t triple = (octet_a << 0x10) + (octet_b << 0x08) + octet_c;
 

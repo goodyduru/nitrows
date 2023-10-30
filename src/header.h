@@ -93,6 +93,8 @@ int16_t parse_extensions(int socketfd, char *start, ExtensionList *extension_lis
  * Validate header. Check for the different required and optional headers in
  * the http request.
  * 
+ * @param buf Request string
+ * @param request_length Length of request string
  * @param socketfd Client socket descriptor
  * @param key Contains the Sec-Websocket-Key value. This function will
  * concatenate its value and the GUID and add them to the buffer.
@@ -107,7 +109,7 @@ int16_t parse_extensions(int socketfd, char *start, ExtensionList *extension_lis
  * @returns bool true if response is successfully sent, false otherwise
  * 
 */
-bool validate_headers(char buf[], int socketfd, char key[], char subprotocol[],
+bool validate_headers(char buf[], uint16_t request_length, int socketfd, char key[], char subprotocol[],
                       int subprotocol_len, uint8_t **extension_indices,
                       uint8_t *indices_count);
 

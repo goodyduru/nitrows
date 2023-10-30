@@ -306,7 +306,12 @@ int64_t handle_data_frame(Client *client, uint8_t buf[], int size) {
          frame->is_final && frame->is_first ) {
         data = buf;
         read += frame->payload_size;
-    } 
+    } else if ( buf >= frame->buffer && buf < frame->buffer+frame->buffer_size) {
+        // If buf is part of the frame data frame buffer, we just need to increase filled size attribute
+        frame->filled_size += size;
+        data = frame->buffer;
+        read = size;
+    }
     else {
         // Allocate or increase size if we don't have enough space
         if ( frame->buffer == NULL && frame->payload_size > 0 ) {

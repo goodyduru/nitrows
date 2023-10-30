@@ -155,10 +155,68 @@ void close_client(Client* client) {
 }
 
 void handle_client_data(Client* client) {
-    int nbytes, read, total_read;
-    uint8_t buf[BUFFER_SIZE];
+    int nbytes, read, total_read, to_read_size;
+    uint8_t data[BUFFER_SIZE], *buf;
+    buf = data;
+    to_read_size = BUFFER_SIZE;
 
-    nbytes = recv(client->socketfd, buf, BUFFER_SIZE, 0);
+    while ( (nbytes = recv(client->socketfd, buf, to_read_size, 0)) > 0 ) {
+        total_read = 0;
+        while ( total_read != nbytes ) {
+            read = 0;
+            // Mask key is the last info in the frame header and is stored in a
+            // character buffer. It's used as a proxy to determine if the frame's
+            // header data has been extracted. If the length of that buffer isn't
+            // 4, the frame header hasn't been completely extracted.
+            if ( client->mask_size != 4 ) {
+                read = extract_header_data(client, buf + total_read,
+                                            nbytes - total_read);
+                if ( read < 0 ) {
+                    close_client(client);
+                    return;
+                }
+            }
+            total_read += read;
+            // Some frames have an empty payload. This ensures we don't ignore them
+            if ( nbytes == total_read ) {
+                if ( client->mask_size == 4 && 
+                    ((client->current_frame_type == CONTROL_FRAME &&
+                    client->control_frame.payload_size > 0) || 
+                    (client->current_frame_type == DATA_FRAME &&
+                    client->data_frame.payload_size > 0))
+                    )  {
+                    break;
+                } else if ( client->mask_size < 4 ) {
+                    break;
+                }
+            }
+
+            if ( client->current_frame_type == CONTROL_FRAME ) {
+                read = handle_control_frame(client, buf + total_read,
+                                            nbytes - total_read);
+            }
+            else {
+                read = handle_data_frame(client, buf + total_read,
+                                        nbytes - total_read);
+            }
+            if ( read < 0 ) {
+                close_client(client);
+                return;
+            }
+            total_read += read;
+            
+        }
+
+        // We can avoid unnecessary copying by storing data directly in the frame buffer
+        if ( client->mask_size == 4 && client->current_frame_type == DATA_FRAME && (client->data_frame.buffer_size - client->data_frame.filled_size) > BUFFER_SIZE ) {
+            buf = client->data_frame.buffer+client->data_frame.filled_size;
+            to_read_size = client->data_frame.payload_size - (client->data_frame.filled_size - client->data_frame.current_fragment_offset);
+        }
+        else {
+            buf = data;
+            to_read_size = BUFFER_SIZE;
+        }
+    }
     // Close connection if there's an error or client closes connection.
     if ( nbytes <= 0 ) {
         if ( nbytes == 0 ) {
@@ -169,51 +227,6 @@ void handle_client_data(Client* client) {
         }
         close_client(client);
         return;
-    }
-    total_read = 0;
-    while ( total_read != nbytes ) {
-        read = 0;
-        // Mask key is the last info in the frame header and is stored in a
-        // character buffer. It's used as a proxy to determine if the frame's
-        // header data has been extracted. If the length of that buffer isn't
-        // 4, the frame header hasn't been completely extracted.
-        if ( client->mask_size != 4 ) {
-            read = extract_header_data(client, buf + total_read,
-                                        nbytes - total_read);
-            if ( read < 0 ) {
-                close_client(client);
-                return;
-            }
-        }
-        total_read += read;
-        // Some frames have an empty payload. This ensures we don't ignore them
-        if ( nbytes == total_read ) {
-            if ( client->mask_size == 4 && 
-                ((client->current_frame_type == CONTROL_FRAME &&
-                  client->control_frame.payload_size > 0) || 
-                 (client->current_frame_type == DATA_FRAME &&
-                  client->data_frame.payload_size > 0))
-                  )  {
-                break;
-            } else if ( client->mask_size < 4 ) {
-                break;
-            }
-        }
-
-        if ( client->current_frame_type == CONTROL_FRAME ) {
-            read = handle_control_frame(client, buf + total_read,
-                                        nbytes - total_read);
-        }
-        else {
-            read = handle_data_frame(client, buf + total_read,
-                                     nbytes - total_read);
-        }
-        if ( read < 0 ) {
-            close_client(client);
-            return;
-        }
-        total_read += read;
-        
     }
 }
 

@@ -70,7 +70,7 @@ struct waiting_clients {
 };
 
 // Table containing all the connected clients.
-WaitingClient *waiting_clients_table[WAITING_CLIENT_TABLE_SIZE];
+static WaitingClient *waiting_clients_table[WAITING_CLIENT_TABLE_SIZE];
 
 typedef struct Extension Extension;
 struct Extension {
@@ -101,9 +101,9 @@ struct Extension {
     void (*close)(int);
 };
 
-Extension *extension_table;
+static Extension *extension_table;
 // I mean come on! It shouldn't be more than 256 extensions.
-int8_t extension_count;
+static int8_t extension_count;
 
 /**
  * This function registers Sec-Websocket-Extensions handlers for different points of processing data from accepting connection to responding with data.

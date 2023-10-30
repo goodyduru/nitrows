@@ -73,7 +73,7 @@ void *get_in_addr(struct sockaddr *sa) {
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
-void accept_connection(listener_socket) {
+void accept_connection(int listener_socket) {
     int newfd;
     struct sockaddr_storage remote_addr;
     socklen_t addrlen;

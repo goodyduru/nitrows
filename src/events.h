@@ -22,7 +22,7 @@ struct Event {
     struct pollfd *objects; // Array to hold the file descriptor
 };
 
-Event event;
+static Event event;
 /**
  * This function creates our event loop. We allocate space for 16 of the events 
  * objects.

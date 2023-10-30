@@ -104,7 +104,7 @@ struct Node {
 };
 
 // Table containing all the connected clients.
-Node *clients_table[HASHTABLE_SIZE];
+static Node *clients_table[HASHTABLE_SIZE];
 
 /**
  * Initialize a websocket client structure and add it to the client table.

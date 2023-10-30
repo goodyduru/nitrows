@@ -28,7 +28,7 @@ struct pmd_client_config {
 };
 
 // Table containing all the connected clients config.
-PMDClientConfig *pmd_config_table[HASHTABLE_SIZE];
+static PMDClientConfig *pmd_config_table[HASHTABLE_SIZE];
 
 bool pmd_validate_offer(int socketfd, ExtensionParam* param);
 uint16_t pmd_respond(int socketfd, char *response);

@@ -425,7 +425,7 @@ int64_t handle_data_frame(Client *client, uint8_t buf[], int size) {
 }
 
 int16_t get_reply_code(uint16_t status_code) {
-    int16_t reply = 0;
+    int reply;
     /**
      * We return normal if code is away, for defined and valid codes, we return
      * 0 to avoid unnecessary copies. For others, we return -1 to send an empty
@@ -448,7 +448,7 @@ int16_t get_reply_code(uint16_t status_code) {
         default:
             reply = -1;
     }
-    return -1;
+    return reply;
 }
 
 void send_close_status(Client *client, Status_code code) {

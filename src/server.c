@@ -51,7 +51,8 @@ void send_error_response(int socketfd, int status_code, char message[]) {
 }
 
 void handle_upgrade(int socketfd) {
-    int nbytes; // Size Of upgrade request
+    int16_t nbytes = 0;
+    uint16_t total = 0; // Size Of upgrade request
     char *p;
     char buf[BUFFER_SIZE]; // Buffer that holds request
     char key[60]; // Buffer that holds sec-websocket-accept value
@@ -59,7 +60,14 @@ void handle_upgrade(int socketfd) {
     uint8_t *extension_indices, indices_count;
     int subprotocol_len;
     bool is_valid;
-    nbytes = recv(socketfd, buf, BUFFER_SIZE, 0);
+    while ( (nbytes = recv(socketfd, buf+total, BUFFER_SIZE-total, 0)) > 0 ) {
+        total += nbytes;
+
+        // Check for http request validity and break if it's valid
+        if ( buf[total-4] == '\r' && buf[total-3] == '\n' && buf[total-2] == '\r' && buf[total-1] == '\n' ) {
+            break;
+        }
+    }
     subprotocol_len = 0;
     indices_count = 0;
     extension_indices = NULL;
@@ -82,7 +90,7 @@ void handle_upgrade(int socketfd) {
         return;
     }
 
-    if ( (is_valid = validate_headers(buf, socketfd, key, subprotocol,
+    if ( (is_valid = validate_headers(buf, total, socketfd, key, subprotocol,
                                         subprotocol_len, &extension_indices,
                                         &indices_count)) == false ) {
         return;
@@ -102,12 +110,12 @@ bool __send_upgrade_response(int socketfd, char key[], char subprotocol[],
     uint16_t ext_response_length, length;
     char response[4096];
     char ext_response[512];
-    unsigned char base64[29];
+    uint8_t base64[29];
     char sha1[20];
     // Create `Sec-WebSocket-Accept` value
     strncpy(key+24, GUID, 36);
     SHA1(sha1, key, 60);
-    base64_encode((unsigned char *) sha1, base64, 20);
+    base64_encode((uint8_t *) sha1, base64, 20);
     base64[28] = '\0';
 
     // Format response based on the presence of subprotocols
@@ -148,7 +156,7 @@ void close_client(Client* client) {
 
 void handle_client_data(Client* client) {
     int nbytes, read, total_read;
-    unsigned char buf[BUFFER_SIZE];
+    uint8_t buf[BUFFER_SIZE];
 
     nbytes = recv(client->socketfd, buf, BUFFER_SIZE, 0);
     // Close connection if there's an error or client closes connection.
@@ -209,7 +217,7 @@ void handle_client_data(Client* client) {
     }
 }
 
-bool send_frame(Client *client, unsigned char *frame, uint64_t size) {
+bool send_frame(Client *client, uint8_t *frame, uint64_t size) {
     ssize_t bytes_sent, total_bytes_sent;
     total_bytes_sent = 0;
     while ( (bytes_sent = send(client->socketfd, frame+total_bytes_sent, size - total_bytes_sent, 0)) > 0 ) {

@@ -50,7 +50,7 @@ void handle_upgrade(int socketfd);
  * @returns bool true if response is successfully sent, false otherwise
  * 
 */
-bool __send_upgrade_response(int socketfd, char key[], char subprotocol[],
+bool __send_upgrade_response(int socketfd, uint8_t key[], char subprotocol[],
                             int subprotocol_len, uint8_t extension_indices[],
                             uint8_t indices_count);
 

@@ -103,7 +103,7 @@ struct Extension {
 
 static Extension *extension_table;
 // I mean come on! It shouldn't be more than 256 extensions.
-static int8_t extension_count;
+static int8_t extension_count = 0;
 
 /**
  * This function registers Sec-Websocket-Extensions handlers for different points of processing data from accepting connection to responding with data.
@@ -122,6 +122,13 @@ void register_extension(char *key, bool (*validate_offer)(int,ExtensionParam*),
                            uint64_t (*generate_data)(int,uint8_t*,uint64_t,Frame *),
                            void (*close)(int)
                         );
+
+/**
+ * Making extension table static means it's not available to other module. This
+ * function allows others to get the specified extension referenced by
+ * @param index
+*/
+Extension *get_extension(uint8_t index);
 
 /**
  * Get a waiting client from the waiting client table. If none, add 

@@ -39,7 +39,7 @@ int16_t is_upgrade_header_valid(int socketfd, char *start);
  * 
  * @return Increase in position. -1 if invalid
  */
-int16_t get_sec_websocket_key_value(int socketfd, char *start, char key[]);
+int16_t get_sec_websocket_key_value(int socketfd, char *start, uint8_t key[]);
 
 
 /**
@@ -109,7 +109,7 @@ int16_t parse_extensions(int socketfd, char *start, ExtensionList *extension_lis
  * @returns bool true if response is successfully sent, false otherwise
  * 
 */
-bool validate_headers(char buf[], uint16_t request_length, int socketfd, char key[], char subprotocol[],
+bool validate_headers(char buf[], uint16_t request_length, int socketfd, uint8_t key[], char subprotocol[],
                       int subprotocol_len, uint8_t **extension_indices,
                       uint8_t *indices_count);
 

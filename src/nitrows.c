@@ -30,7 +30,6 @@ void nitrows_register_extension(char *key, bool (*validate_offer)(int,ExtensionP
 }
 
 int main(){
-    extension_table = NULL;
     nitrows_register_extension("permessage-deflate", pmd_validate_offer,
                                 pmd_respond, pmd_process_data, pmd_generate_response, pmd_close);
     int listener_socket = get_listener_socket();

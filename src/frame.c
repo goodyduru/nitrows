@@ -11,7 +11,6 @@
 
 int8_t extract_header_data(Client *client, uint8_t buf[], int size) {
     int8_t header_read, read;
-    read = 0;
     header_read = 0;
     // If we aren't in frame, extract fin, opcode and check rsvs
     if ( client->current_frame_type == NO_FRAME ) { 
@@ -72,12 +71,10 @@ bool get_frame_type(Client *client, uint8_t byte) {
 
     if ( is_control ) {
         if ( !is_final_frame ) return false;
-        frame = &client->control_frame;
         frame->is_first = true;
         client->current_frame_type = CONTROL_FRAME;
     }
     else {
-        frame = &client->data_frame;
         if ( opcode != CONTINUATION && frame->type == INVALID ) {
             frame->is_first = true;
         }
@@ -230,6 +227,7 @@ void handle_close_frame(Client *client, uint8_t *data) {
             send_close_status(client, 0);
             return;
         } else if ( new_status_code > 0 ) {
+            new_status_code = htons(new_status_code);
             memcpy(data, &new_status_code, 2);
         }
 
@@ -241,6 +239,33 @@ void handle_close_frame(Client *client, uint8_t *data) {
         }
     }
     send_close_frame(client, data, payload_size);
+}
+
+int16_t get_reply_code(uint16_t status_code) {
+    int16_t reply;
+    /**
+     * We return normal if code is away, for defined and valid codes, we return
+     * 0 to avoid unnecessary copies. For others, we return -1 to send an empty
+     * close frame.
+    */
+    switch ( status_code ) {
+        case AWAY: 
+            reply = NORMAL;
+            break;
+        case NORMAL:
+        case PROTOCOL_ERROR:
+        case INVALID_TYPE:
+        case INVALID_ENCODING:
+        case VIOLATION:
+        case TOO_LARGE:
+        case INVALID_EXTENSION:
+        case UNEXPECTED_CONDITION:
+            reply = 0;
+            break;
+        default:
+            reply = -1;
+    }
+    return reply;
 }
 
 int8_t handle_control_frame(Client *client, uint8_t buf[], int size) {
@@ -294,8 +319,8 @@ int8_t handle_control_frame(Client *client, uint8_t buf[], int size) {
 
 int64_t handle_data_frame(Client *client, uint8_t buf[], int size) {
     int64_t read = 0;
-    uint8_t *data;
     Frame *frame = &client->data_frame;
+    uint8_t *data = frame->buffer;
 
     // Avoid unnecessary copies and allocations. We can use the buf directly.
     // If size of buffer is less than payload size, the data needs to be copied
@@ -309,14 +334,14 @@ int64_t handle_data_frame(Client *client, uint8_t buf[], int size) {
     } else if ( buf >= frame->buffer && buf < frame->buffer+frame->buffer_size) {
         // If buf is part of the frame data frame buffer, we just need to increase filled size attribute
         frame->filled_size += size;
-        data = frame->buffer;
         read = size;
     }
-    else {
+    else if ( frame->payload_size > 0 ) {
         // Allocate or increase size if we don't have enough space
-        if ( frame->buffer == NULL && frame->payload_size > 0 ) {
+        if ( frame->buffer == NULL ) {
             frame->buffer = (uint8_t *)malloc(frame->payload_size);
             frame->buffer_size = frame->payload_size;
+            data = frame->buffer;
         }
         else if ( (frame->buffer_size - frame->current_fragment_offset) <       
                     frame->payload_size ) {
@@ -328,8 +353,8 @@ int64_t handle_data_frame(Client *client, uint8_t buf[], int size) {
             frame->buffer_size += remaining_space;
             frame->buffer_size = (frame->buffer_size + BUFFER_SIZE - 1) & ~(BUFFER_SIZE - 1); // Round to a multiple of buffer size
             frame->buffer = (uint8_t *)realloc(frame->buffer, frame->buffer_size);
+            data = frame->buffer;
         }
-        data = frame->buffer;
         uint64_t to_copy_size = frame->payload_size - (frame->filled_size - frame->current_fragment_offset);
         to_copy_size = (to_copy_size >= size) ? size : to_copy_size;
 
@@ -365,13 +390,18 @@ int64_t handle_data_frame(Client *client, uint8_t buf[], int size) {
         } else if ( client->indices_count > 0 ) {
             uint8_t *output = NULL;
             uint64_t output_length = 0;
+            Extension *extension;
             if ( data == buf ) {
                 frame->buffer = data;
                 frame->buffer_size = frame->payload_size;
                 frame->filled_size = frame->payload_size;
             }
             for ( uint8_t i = 0; i < client->indices_count; i++ ) {
-                is_valid = extension_table[client->extension_indices[i]].process_data(client->socketfd, frame, &output, &output_length);
+                extension = get_extension(client->extension_indices[i]);
+                if ( extension == NULL ) {
+                    continue;
+                }
+                is_valid = extension->process_data(client->socketfd, frame, &output, &output_length);
                 if ( !is_valid ) {
                     send_close_status(client, INVALID_EXTENSION);
                     return -1;
@@ -422,33 +452,6 @@ int64_t handle_data_frame(Client *client, uint8_t buf[], int size) {
         frame->buffer = NULL;
     }
     return read;
-}
-
-int16_t get_reply_code(uint16_t status_code) {
-    int reply;
-    /**
-     * We return normal if code is away, for defined and valid codes, we return
-     * 0 to avoid unnecessary copies. For others, we return -1 to send an empty
-     * close frame.
-    */
-    switch ( status_code ) {
-        case AWAY: 
-            reply = NORMAL;
-            break;
-        case NORMAL:
-        case PROTOCOL_ERROR:
-        case INVALID_TYPE:
-        case INVALID_ENCODING:
-        case VIOLATION:
-        case TOO_LARGE:
-        case INVALID_EXTENSION:
-        case UNEXPECTED_CONDITION:
-            reply = 0;
-            break;
-        default:
-            reply = -1;
-    }
-    return reply;
 }
 
 void send_close_status(Client *client, Status_code code) {
@@ -504,6 +507,7 @@ bool send_data_frame(Client *client, uint8_t *message) {
     uint8_t first_byte;
     uint64_t size, output_size;
     Frame *frame = &client->data_frame;
+    Extension *extension;
     if ( frame->buffer_size == 0 ) {
         size = frame->payload_size;
     }
@@ -512,7 +516,11 @@ bool send_data_frame(Client *client, uint8_t *message) {
     }
     first_byte = 128;
     for ( uint8_t i = 0; i < client->indices_count; i++ ) {
-        output_size = extension_table[client->extension_indices[i]].generate_data(client->socketfd, message, size, &client->output_frame);
+        extension = get_extension(client->extension_indices[i]);
+            if ( extension == NULL ) {
+                continue;
+            }
+        output_size = extension->generate_data(client->socketfd, message, size, &client->output_frame);
         if ( output_size > 0 ) {
             if ( i > 0 ) {
                 free(message);

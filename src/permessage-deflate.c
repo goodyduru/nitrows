@@ -54,6 +54,9 @@ PMDClientConfig* pmd_get_from_table(int socketfd) {
 }
 
 bool pmd_validate_offer(int socketfd, ExtensionParam* param) {
+    if ( param == NULL ) {
+        return false;
+    }
     bool has_seen_server_context_takeover = false;
     bool has_seen_client_context_takeover = false;
     bool has_seen_client_max_window_bits = false;
@@ -139,9 +142,11 @@ bool pmd_validate_offer(int socketfd, ExtensionParam* param) {
             server_no_context_takeover = false;
             client_max_window_bits = 0;
             server_max_window_bits = 0;
+        } else if ( acceptable && param->next == NULL ) {
+            acceptable = false;
         }
         param = param->next;
-    } 
+    }
     if ( !acceptable ) {
         free(config);
     }

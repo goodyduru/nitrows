@@ -8,12 +8,12 @@ PRODUCT = nitrows
 
 # What we're building with
 CXX = clang
-CFLAGS := -Wall -std=c99
+CFLAGS := -Wall -std=c99 -I/usr/local/opt/openssl/include
 CFLAGS_DEBUG := -g -DDEBUG -O0
 CFLAGS_ASAN := -O1 -g -fsanitize=address
-CFLAGS_RELEASE := -O3
-LDFLAGS = -lz
-
+CFLAGS_RELEASE :=  -O3
+CFLAGS_TIDY := clang-tidy
+LDFLAGS = -L/usr/local/opt/openssl/lib -lz -lcrypto
 ifeq ($(DEBUG),1)
   CFLAGS := $(CFLAGS_DEBUG) $(CFLAGS)
 else ifeq ($(ASAN),1)
@@ -23,6 +23,8 @@ else
   CFLAGS := $(CFLAGS_RELEASE) $(CFLAGS)
 endif
 
+tidy:
+	$(CFLAGS_TIDY) *.c *.h -- $(CFLAGS)
 # By default, make the product.
 all:		$(PRODUCT)
 

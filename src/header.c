@@ -21,7 +21,6 @@ int16_t move_to_next_line(char *start) {
 }
 
 int16_t is_upgrade_header_valid(int socketfd, char *start) {
-    int cmp;
     char *p = start;
 
     // Search for the presence of the first non-whitespace character
@@ -32,7 +31,7 @@ int16_t is_upgrade_header_valid(int socketfd, char *start) {
         send_error_response(socketfd, 400, "Invalid Upgrade header");
         return -1;
     }
-    if ( (cmp = strncasecmp(p, "websocket", 9)) != 0 ) {
+    if ( strncasecmp(p, "websocket", 9) != 0 ) {
         send_error_response(socketfd, 400, "Invalid Upgrade header value");
         return -1;
     }
@@ -40,7 +39,7 @@ int16_t is_upgrade_header_valid(int socketfd, char *start) {
     return p - start;
 }
 
-int16_t get_sec_websocket_key_value(int socketfd, char *start, char key[]) {
+int16_t get_sec_websocket_key_value(int socketfd, char *start, uint8_t key[]) {
     char c;
     char *p = start;
     while ( *p == ' ' || *p == '\t' ) {
@@ -79,7 +78,6 @@ int16_t get_sec_websocket_key_value(int socketfd, char *start, char key[]) {
 }
 
 int16_t is_version_header_valid(int socketfd, char *start) {
-    int cmp;
     char *p = start;
     while ( *p == ' ' || *p == '\t' ) {
         p++;
@@ -89,7 +87,7 @@ int16_t is_version_header_valid(int socketfd, char *start) {
                             "Invalid Sec-Websocket-Version header");
         return -1;
     }
-    if ( (cmp = strncasecmp(p, "13", 2)) != 0 ) {
+    if ( strncasecmp(p, "13", 2) != 0 ) {
         send_error_response(socketfd, 400,
                             "Invalid Sec-Websocket-Version header value");
         return -1;
@@ -159,6 +157,10 @@ int16_t parse_extensions(int socketfd, char *line,
             start = NULL;
             length = 0;
             current_params = get_extension_params(extension_list, key, true);
+            if ( current_params == NULL ) {
+                send_error_response(socketfd, 400, error);
+                return -1;
+            }
             while ( current_params != NULL && current_params->value_type != EMPTY ) {
                 prev_params = current_params;
                 current_params = current_params->next;
@@ -244,6 +246,10 @@ int16_t parse_extensions(int socketfd, char *line,
         strncpy(key, start, length);
         key[length] = '\0';
         current_params = get_extension_params(extension_list, key, true);
+        if ( current_params == NULL ) {
+            send_error_response(socketfd, 400, error);
+            return -1;
+        }
         while ( current_params != NULL && current_params->value_type != EMPTY ) {
             prev_params = current_params;
             current_params = current_params->next;
@@ -289,7 +295,7 @@ int16_t parse_extensions(int socketfd, char *line,
     return p - line;
 }
 
-bool validate_headers(char buf[], uint16_t request_length, int socketfd, char key[], char subprotocol[],
+bool validate_headers(char buf[], uint16_t request_length, int socketfd, uint8_t key[], char subprotocol[],
                       int subprotocol_len, uint8_t **extension_indices,
                       uint8_t *indices_count) {
     char *p;
@@ -300,6 +306,7 @@ bool validate_headers(char buf[], uint16_t request_length, int socketfd, char ke
                        "Sec-Websocket-Extensions:"};
     int8_t header_count = 6;
     bool required_headers_present[] = {false, false, false, false}; // Store required headers check status here.
+    bool is_valid = true;
     p = buf;
     ExtensionList *list = get_extension_list(socketfd);
     while ( *p != '\0' && (p - buf) < request_length && 
@@ -318,21 +325,24 @@ bool validate_headers(char buf[], uint16_t request_length, int socketfd, char ke
                 break;
             } else if ( index == 1 ) {
                 if ( (progress = is_upgrade_header_valid(socketfd, p)) == -1 ) {
-                    return false;
+                    is_valid = false;
+                    break;
                 }
                 p += progress;
                 required_headers_present[index] = true;
                 break;
             } else if ( index == 2 ) {
                 if ( (progress = get_sec_websocket_key_value(socketfd, p, key)) == -1){
-                    return false;
+                    is_valid = false;
+                    break;
                 }
                 p += progress;
                 required_headers_present[index] = true;
                 break;
             } else if ( index == 3 ) {
                 if ( (progress = is_version_header_valid(socketfd, p)) == -1) {
-                    return false;
+                    is_valid = false;
+                    break;
                 }
                 p += progress;
                 required_headers_present[index] = true;
@@ -340,17 +350,23 @@ bool validate_headers(char buf[], uint16_t request_length, int socketfd, char ke
             } else if ( index == 4 ) {
                 if ( (progress = get_subprotocols(socketfd, p, subprotocol,
                                         &subprotocol_len)) == -1) {
-                    return false;
+                    is_valid = false;
+                    break;
                 }
                 p += progress;
                 break;
             } else {
                 if ( (progress = parse_extensions(socketfd, p, list)) == -1) {
-                    return false;
+                    is_valid = false;
+                    break;
                 }
                 p += progress;
                 break;
             }
+        }
+        if ( !is_valid ) {
+            delete_extension_list(socketfd);
+            return is_valid;
         }
         if ( (progress = move_to_next_line(p)) == -1 ) {
             return false;
@@ -367,7 +383,7 @@ bool validate_headers(char buf[], uint16_t request_length, int socketfd, char ke
         index++;
     }
 
-    bool is_valid = validate_extension_list(socketfd, list, extension_indices,
+    is_valid = validate_extension_list(socketfd, list, extension_indices,
                                             indices_count);
     delete_extension_list(socketfd);
     return is_valid;

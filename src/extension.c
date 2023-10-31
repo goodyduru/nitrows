@@ -10,7 +10,7 @@ void register_extension(char *key, bool (*validate_offer)(int,ExtensionParam*),
                            uint64_t (*generate_data)(int,uint8_t*,uint64_t,Frame*),
                            void (*close)(int)
                         ) {
-    if ( extension_table == NULL ) {
+    if ( extension_count == 0 ) {
         extension_table = (Extension *)malloc(sizeof(Extension));
         extension_table[0].key = strdup(key);
         extension_table[0].validate_offer = validate_offer;
@@ -30,6 +30,13 @@ void register_extension(char *key, bool (*validate_offer)(int,ExtensionParam*),
         extension_table[extension_count].close = close;
         extension_count++;
     }
+}
+
+Extension *get_extension(uint8_t index) {
+    if ( index >= extension_count ) {
+        return NULL;
+    }
+    return &extension_table[index];
 }
 
 int16_t find_extension_functions(char *key) {
@@ -65,6 +72,7 @@ ExtensionList *get_extension_list(int socketfd) {
         client->next = waiting_clients_table[index];
         client->extensions = (ExtensionList *) calloc(1, sizeof(ExtensionList));
         client->socketfd = socketfd;
+        waiting_clients_table[index] = client;
     }
     return client->extensions;
 }
@@ -137,7 +145,7 @@ bool validate_extension_list(int socketfd, ExtensionList *list,
     int16_t found;
     uint8_t count = *indices_count;
     uint8_t *indices = *extension_indices;
-    uint8_t size;
+    uint8_t size = 0;
     while ( list != NULL ) {
         found = find_extension_functions(list->token);
         if ( found == -1 ) {
@@ -151,7 +159,7 @@ bool validate_extension_list(int socketfd, ExtensionList *list,
             }
             return false;
         }
-        if ( indices == NULL ) {
+        if ( indices == NULL || size == 0 ) {
             indices = (uint8_t *) malloc(sizeof(uint8_t));
             indices[count] = found;
             size = 1;
@@ -163,7 +171,7 @@ bool validate_extension_list(int socketfd, ExtensionList *list,
                     break;
                 }
                 size *= 2;
-                indices = (uint8_t *) malloc(sizeof(uint8_t)*size);
+                indices = (uint8_t *) realloc(indices, size);
             }
             indices[count] = found;
             count++;

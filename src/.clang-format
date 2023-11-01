@@ -1,0 +1,6 @@
+# Taken from CMU clang format file.
+
+BasedOnStyle: Google
+DerivePointerAlignment: false
+PointerAlignment: Right
+ColumnLimit: 120

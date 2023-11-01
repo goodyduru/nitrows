@@ -12,7 +12,8 @@ CFLAGS := -Wall -std=c99 -I/usr/local/opt/openssl/include
 CFLAGS_DEBUG := -g -DDEBUG -O0
 CFLAGS_ASAN := -O1 -g -fsanitize=address
 CFLAGS_RELEASE :=  -O3
-CFLAGS_TIDY := clang-tidy
+TIDY := clang-tidy
+FORMAT := clang-format
 LDFLAGS = -L/usr/local/opt/openssl/lib -lz -lcrypto
 ifeq ($(DEBUG),1)
   CFLAGS := $(CFLAGS_DEBUG) $(CFLAGS)
@@ -23,10 +24,14 @@ else
   CFLAGS := $(CFLAGS_RELEASE) $(CFLAGS)
 endif
 
-tidy:
-	$(CFLAGS_TIDY) *.c *.h -- $(CFLAGS)
 # By default, make the product.
 all:		$(PRODUCT)
+
+tidy:
+	$(TIDY) $(HEADERS) $(PRODUCT_SOURCES) -- $(CFLAGS)
+
+format: 
+	$(FORMAT) -i -style=file $(HEADERS) $(PRODUCT_SOURCES)
 
 # How to clean up
 clean:

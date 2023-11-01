@@ -7,13 +7,14 @@
 
 #include "clients.h"
 /**
- * A generic function that will handle connection from clients. Socket desc
- * owned by a client in the table will be handled by data frame function,
- * those that are aren't will have their connection upgraded.
+ * A generic function that will handle connection from clients. Socket desc owned by a client in the table will be
+ * handled by data frame function, those that are aren't will have their connection upgraded. It closes the client if
+ * the is_closed variable is set to true
  *
  * @param socketfd Socket descriptor
+ * @param is_close boolean to signify closure of socket.
  */
-void handle_connection(int socketfd);
+void handle_connection(int socketfd, bool is_close);
 
 /**
  * Send http error response and close the connection
@@ -25,9 +26,8 @@ void handle_connection(int socketfd);
 void send_error_response(int socketfd, int status_code, char message[]);
 
 /**
- * Handles connection upgrade using the http protocol and it's successful,
- * we create a client object and add it to our table. If not, we close the
- * connection and remove it from our loop.
+ * Handles connection upgrade using the http protocol and it's successful, we create a client object and add it to our
+ * table. If not, we close the connection and remove it from our loop.
  *
  * @param socketfd Socket descriptor
  */
@@ -41,8 +41,7 @@ void handle_upgrade(int socketfd);
 void close_client(Client *client);
 
 /**
- * Handles from a client. This is only for clients that are in our
- * connection table.
+ * Handles from a client. This is only for clients that are in our connection table.
  *
  * @param client Connected client
  */

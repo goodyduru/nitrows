@@ -15,17 +15,20 @@
 #include "frame.h"
 #include "header.h"
 
-void handle_connection(int socketfd) {
+void handle_connection(int socketfd, bool is_close) {
   Client *client = get_client(socketfd);
   if (client == NULL) {
-    // If a client is not in the table, then it is probably initiating the
-    // websocket protocol by sending a connection upgrade request. This
-    // calls the function that handle the request.
+    // If a client is not in the table, then it is probably initiating the websocket protocol by sending a connection
+    // upgrade request. This calls the function that handle the request.
     handle_upgrade(socketfd);
   } else {
-    // A client found in the table is more likely sending a frame. This
-    // calls the function that handles the frame request.
-    handle_client_data(client);
+    // A client found in the table is more likely sending a frame. This calls the function that handles the frame
+    // request.
+    if (is_close) {
+      close_client(client);
+    } else {
+      handle_client_data(client);
+    }
   }
 }
 

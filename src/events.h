@@ -1,8 +1,17 @@
 #ifndef NITROWS_SRC_EVENTS_H
 #define NITROWS_SRC_EVENTS_H
 
-#include <poll.h>
+#include <stdbool.h>
 #include <stdint.h>
+#ifdef __APPLE__
+#include <sys/event.h>
+#include <sys/types.h>
+#else
+#include <poll.h>
+#endif
+
+// Initial number of sockets to be monitored by our event library.
+#define INITIAL_EVENT_SIZE 16
 
 /**
  * We need a portable way to handle events. This allows our server to switch
@@ -11,18 +20,29 @@
  */
 
 typedef struct Event Event;
+
 /**
  * This struct will hold whatever event array that will contain the file
  * descriptors that we are interested in. It will also hold metadata
  * that will give us the size and count of the array.
  */
+#ifdef __APPLE__
+struct Event {
+  uint64_t count;
+  uint64_t size;
+  struct kevent *objects;
+  struct kevent outs[INITIAL_EVENT_SIZE];
+};
+static int kq;
+#else
 struct Event {
   uint64_t count;          // Number of file descriptors in the array
   uint64_t size;           // Size of the array
   struct pollfd *objects;  // Array to hold the file descriptor
 };
+#endif
 
-static Event event;
+static Event nitrows_event;
 /**
  * This function creates our event loop. We allocate space for 16 of the events
  * objects.
@@ -54,6 +74,5 @@ void delete_from_event_loop(int socketfd);
  * that is ready to be read.
  * @param handle_others function that runs if it's other sockets.
  */
-void run_event_loop(int listener, void (*handle_listener)(int), void (*handle_others)(int));
-
+void run_event_loop(int listener, void (*handle_listener)(int), void (*handle_others)(int, bool));
 #endif

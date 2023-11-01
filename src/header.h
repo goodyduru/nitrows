@@ -1,11 +1,14 @@
 /**
  * Websocket connection header functions.
  */
-#ifndef INCLUDED_HEADER_DOT_H
-#define INCLUDED_HEADER_DOT_H
+#ifndef NITROWS_SRC_HEADER_H
+#define NITROWS_SRC_HEADER_H
 
 #include <stdbool.h>
+
 #include "extension.h"
+
+#define CLIENT_ERROR 400
 /**
  * Move header to next line and make sure newlines are valid.
  * 
@@ -13,7 +16,7 @@
  * 
  * @return Increase in position. -1 if invalid
 */
-int16_t move_to_next_line(char *string);
+int16_t move_to_next_line(char *start);
 
 /**
  * Check the validity of the `Upgrade` header in the opening
@@ -86,7 +89,7 @@ int16_t get_subprotocols(int socketfd, char *start, char subprotocol[],
  * 
  * @return Increase in position. -1 if invalid
  */
-int16_t parse_extensions(int socketfd, char *start, ExtensionList *extension_list);
+int16_t parse_extensions(int socketfd, char *line, ExtensionList *extension_list);
 
 
 /**

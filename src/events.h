@@ -1,8 +1,8 @@
-#ifndef INCLUDED_EVENTS_DOT_H
-#define INCLUDED_EVENTS_DOT_H
+#ifndef NITROWS_SRC_EVENTS_H
+#define NITROWS_SRC_EVENTS_H
 
-#include <stdint.h>
 #include <poll.h>
+#include <stdint.h>
 
 /**
  * We need a portable way to handle events. This allows our server to switch 
@@ -42,9 +42,8 @@ void add_to_event_loop(int socketfd);
  * array size if the number of file descriptors falls below a chosen threshold.
  * 
  * @param socketfd socket descriptor to be deleted
- * @param index index of the socket descriptor. Set to -1 if not known.
 */
-void delete_from_event_loop(int socketfd, int index);
+void delete_from_event_loop(int socketfd);
 
 /**
  * Runs the event loop. If any of the file descriptor is ready, we handle

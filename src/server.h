@@ -2,8 +2,8 @@
  * Websocket server functions. We'll handle websocket connection upgrade and
  * data frames here.
  */
-#ifndef INCLUDED_SERVER_DOT_H
-#define INCLUDED_SERVER_DOT_H
+#ifndef NITROWS_SRC_SERVER_H
+#define NITROWS_SRC_SERVER_H
 
 #include "clients.h"
 /**
@@ -32,27 +32,6 @@ void send_error_response(int socketfd, int status_code, char message[]);
  * @param socketfd Socket descriptor
  */
 void handle_upgrade(int socketfd);
-
-/**
- * Send upgrade response handshake to a correct client handshake. The response
- * might include a subprotocol or/and extension header if the request contained
- * them.
- * 
- * @param socketfd Client socket descriptor
- * @param key Contains the Sec-Websocket-Key value. This function will
- * concatenate its value and the GUID and add them to the buffer.
- * @param subprotocol Contains the first protocol from the request's
- * Sec-Websocket-Protocol values. Can be empty
- * @param subprotocol_len Subprotocol string length. 0 if subprotocol is empty
- * @param extension_indices Array of extension index needed by the client
- * @param indices_count Length of the index array
- * 
- * @returns bool true if response is successfully sent, false otherwise
- * 
-*/
-bool __send_upgrade_response(int socketfd, uint8_t key[], char subprotocol[],
-                            int subprotocol_len, uint8_t extension_indices[],
-                            uint8_t indices_count);
 
 /**
  * Closes client and delete all info concerning the client

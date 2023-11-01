@@ -1,5 +1,5 @@
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "extension.h"
@@ -21,7 +21,13 @@ void register_extension(char *key, bool (*validate_offer)(int,ExtensionParam*),
         extension_count = 1;
     }
     else {
-        extension_table = (Extension *)realloc(extension_table, sizeof(Extension)*(extension_count+1));
+        Extension *temp;
+        temp = (Extension *)realloc(extension_table, sizeof(Extension)*(extension_count+1));
+        if ( temp == NULL ) {
+            free(extension_table);
+            exit(1);
+        }
+        extension_table = temp;
         extension_table[extension_count].key = strdup(key);
         extension_table[extension_count].validate_offer = validate_offer;
         extension_table[extension_count].respond_to_offer = respond_to_offer;
@@ -53,16 +59,15 @@ int16_t find_extension_functions(char *key) {
 
 
 ExtensionList *get_extension_list(int socketfd) {
-    int index; // Index in the table
-
     // We get the index of the client using the socket descriptor as 
     // key. We then search the linked list to get the node containing
     // the client.
-    index = socketfd % WAITING_CLIENT_TABLE_SIZE;
+    int index = socketfd % WAITING_CLIENT_TABLE_SIZE;
     WaitingClient* client = waiting_clients_table[index];
     while ( client != NULL ) {
-        if ( client->socketfd == socketfd )
+        if ( client->socketfd == socketfd ) {
             break;
+        }
         client = client->next;
     }
     
@@ -79,13 +84,10 @@ ExtensionList *get_extension_list(int socketfd) {
 
 
 void delete_extension_list(int socketfd) {
-    int index;
-    // We need both of these variables to delete from the linked list.
-    WaitingClient *prev, *current;
+    int index = socketfd % WAITING_CLIENT_TABLE_SIZE;
 
-    index = socketfd % WAITING_CLIENT_TABLE_SIZE;
-
-    prev = waiting_clients_table[index];
+    WaitingClient *prev = waiting_clients_table[index];
+    WaitingClient *current = NULL;
 
     // Nothing is found in table. That will be strange.
     if ( prev == NULL ) {
@@ -116,12 +118,12 @@ void delete_extension_list(int socketfd) {
         free_extension_list(current->extensions);
         free(current);
     }
-    return;
 }
 
 void free_extension_list(ExtensionList *list) {
-    ExtensionList *next;
-    ExtensionParam *current, *next_param;
+    ExtensionList *next = NULL;
+    ExtensionParam *current = NULL;
+    ExtensionParam *next_param = NULL;
     while ( list != NULL ) {
         next = list->next;
         current = list->params;
@@ -142,9 +144,10 @@ bool validate_extension_list(int socketfd, ExtensionList *list,
         return true;
     }
     bool is_valid = true;
-    int16_t found;
+    int16_t found = 0;
     uint8_t count = *indices_count;
     uint8_t *indices = *extension_indices;
+    uint8_t *temp;
     uint8_t size = 0;
     while ( list != NULL ) {
         found = find_extension_functions(list->token);
@@ -171,7 +174,12 @@ bool validate_extension_list(int socketfd, ExtensionList *list,
                     break;
                 }
                 size *= 2;
-                indices = (uint8_t *) realloc(indices, size);
+                temp = (uint8_t *) realloc(indices, size);
+                if ( temp == NULL ) {
+                    free(indices);
+                    return false;
+                }
+                indices = temp;
             }
             indices[count] = found;
             count++;
@@ -216,7 +224,7 @@ ExtensionParam* get_extension_params(ExtensionList *list, char *key, bool create
 }
 
 void print_list(ExtensionList *list) {
-    ExtensionParam *param;
+    ExtensionParam *param = NULL;
     char truthy[] = "true";
     char falsy[] = "false";
     while ( list != NULL ) {

@@ -1,29 +1,33 @@
-#include <stdio.h>
+#include <netdb.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
+#include <unistd.h>
+
 #include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <netdb.h>
-#include <unistd.h>
 
 #include "defs.h"
 #include "events.h"
 #include "net.h"
 
 int get_listener_socket() {
-    int listener; // Listener socket descriptor
+    int listener = 0; // Listener socket descriptor
     int yes = 1; // We need it to setup SO_REUSEADDR 
-    int rv;
+    int rv = 0;
 
-    struct addrinfo hints, *ai, *p;
+    struct addrinfo hints;
+    struct addrinfo *ai;
+    struct addrinfo *p;
 
     // Get a socket from the OS and bind it
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;
-    if ( (rv = getaddrinfo(NULL, PORT, &hints, &ai)) != 0 ) {
+    rv = getaddrinfo(NULL, PORT, &hints, &ai);
+    if ( rv != 0 ) {
         printf("Error %s", gai_strerror(rv));
         return -1;
     }
@@ -74,7 +78,7 @@ void *get_in_addr(struct sockaddr *sa) {
 }
 
 void accept_connection(int listener_socket) {
-    int newfd;
+    int newfd = 0;
     struct sockaddr_storage remote_addr;
     socklen_t addrlen;
 

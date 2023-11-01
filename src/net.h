@@ -2,8 +2,8 @@
  * This module handles networking related features. Accepting new connection
  * and creating a listener socket will be done here.
  */
-#ifndef INCLUDED_NET_DOT_H
-#define INCLUDED_NET_DOT_H
+#ifndef NITROWS_SRC_NET_H
+#define NITROWS_SRC_NET_H
 
 /**
  * Create and get our server's listener socket descriptor. This descriptor

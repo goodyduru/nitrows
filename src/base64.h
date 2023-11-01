@@ -28,9 +28,9 @@ void base64_encode(const uint8_t *data,
 
     for (int i = 0, j = 0; i < input_length;) {
 
-        uint32_t octet_a = i < input_length ? (uint8_t)data[i++] : 0;
-        uint32_t octet_b = i < input_length ? (uint8_t)data[i++] : 0;
-        uint32_t octet_c = i < input_length ? (uint8_t)data[i++] : 0;
+        uint32_t octet_a = i < input_length ? data[i++] : 0;
+        uint32_t octet_b = i < input_length ? data[i++] : 0;
+        uint32_t octet_c = i < input_length ? data[i++] : 0;
 
         uint32_t triple = (octet_a << 0x10) + (octet_b << 0x08) + octet_c;
 
@@ -40,7 +40,8 @@ void base64_encode(const uint8_t *data,
         encoded_data[j++] = encoding_table[(triple >> 0 * 6) & 0x3F];
     }
 
-    for (int i = 0; i < mod_table[input_length % 3]; i++)
+    for (int i = 0; i < mod_table[input_length % 3]; i++) {
         encoded_data[output_length - 1 - i] = '=';
+    }
 }
 #endif

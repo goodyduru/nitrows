@@ -1,17 +1,18 @@
 #include <assert.h>
-#include <stdlib.h>
+#include <limits.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
 #include "extension.h"
 #include "frame.h"
-#include "utf8.h"
 #include "server.h"
+#include "utf8.h"
 
 int8_t extract_header_data(Client *client, uint8_t buf[], int size) {
-    int8_t header_read, read;
-    header_read = 0;
+    int8_t header_read = 0;
+    int8_t read = 0;
     // If we aren't in frame, extract fin, opcode and check rsvs
     if ( client->current_frame_type == NO_FRAME ) { 
         if ( !get_frame_type(client, buf[0]) ) {
@@ -26,7 +27,7 @@ int8_t extract_header_data(Client *client, uint8_t buf[], int size) {
 
     // Extract payload size if we haven't
     Frame *current_frame = (client->current_frame_type == CONTROL_FRAME) ? &client->control_frame : &client->data_frame;
-    if ( client->header_size == 0 || (current_frame->payload_size <= 127 && client->current_header[0] != current_frame->payload_size) ) {
+    if ( client->header_size == 0 || (current_frame->payload_size <= MAX_PAYLOAD_VALUE && client->current_header[0] != current_frame->payload_size) ) {
         read = get_payload_data(client, buf+header_read, size-header_read);
         if ( read < 0 ) {
             return -1;
@@ -44,7 +45,7 @@ int8_t extract_header_data(Client *client, uint8_t buf[], int size) {
 }
 
 bool get_frame_type(Client *client, uint8_t byte) {
-    bool is_final_frame = ( byte > 127 );
+    bool is_final_frame = ( byte > CHAR_MAX );
     bool rsv1 = (byte & 64) >> 6;
     bool rsv2 = (byte & 32) >> 5;
     bool rsv3 = (byte & 16) >> 4;
@@ -70,7 +71,9 @@ bool get_frame_type(Client *client, uint8_t byte) {
     Frame *frame = is_control ? &client->control_frame : &client->data_frame;
 
     if ( is_control ) {
-        if ( !is_final_frame ) return false;
+        if ( !is_final_frame ) {
+             return false;
+        }
         frame->is_first = true;
         client->current_frame_type = CONTROL_FRAME;
     }
@@ -99,7 +102,7 @@ bool are_rsv_bits_valid(bool rsv1, bool rsv2, bool rsv3) {
     return (!rsv1 && !rsv2 && !rsv3);
 }
 
-int8_t get_payload_data(Client *client, uint8_t buf[], int size) {
+int8_t get_payload_data(Client *client, const uint8_t buf[], int size) {
     int8_t read = 0;
     if ( client->header_size == 0 ) {
         // Empty header size means we've not check the existence of mask.
@@ -111,9 +114,10 @@ int8_t get_payload_data(Client *client, uint8_t buf[], int size) {
         }
     }
 
-    uint8_t header_size, payload_length;
+    uint8_t header_size = 0;
+    uint8_t payload_length = 0;
     if ( client->header_size == 0 ) {
-        payload_length = (buf[0] & 127);
+        payload_length = (buf[0] & MAX_PAYLOAD_VALUE);
         client->current_header[0] = payload_length;
         client->header_size = 1;
         header_size = client->header_size;
@@ -139,10 +143,10 @@ int8_t get_payload_data(Client *client, uint8_t buf[], int size) {
      */
     bool is_control = (client->current_frame_type == CONTROL_FRAME);
     Frame *frame = is_control ? &client->control_frame : &client->data_frame;
-    if ( payload_length < 126 ) {
+    if ( payload_length < (MAX_PAYLOAD_VALUE-1) ) {
         frame->payload_size = payload_length;
         read = 1;
-    } else if ( payload_length == 126 && !is_control ) {
+    } else if ( payload_length == (MAX_PAYLOAD_VALUE-1) && !is_control ) {
         // Payload length is a short integer
         while ( header_size < 3 && read < size ) {
             client->current_header[header_size] = buf[read];
@@ -155,22 +159,22 @@ int8_t get_payload_data(Client *client, uint8_t buf[], int size) {
             return read;
         }
 
-        uint16_t s;
+        uint16_t s = 0;
         memcpy(&s, client->current_header+1, 2);
         frame->payload_size = (uint64_t)ntohs(s);
-    } else if ( payload_length == 127 && !is_control ) {
+    } else if ( payload_length == MAX_PAYLOAD_VALUE && !is_control ) {
         // Payload length is a long integer
-        while ( header_size < 9 && read < size ) {
+        while ( header_size < MAX_FRAME_HEADER_SIZE && read < size ) {
             client->current_header[header_size] = buf[read];
             header_size++;
             read++;
         }
         client->header_size = header_size;
-        if ( header_size < 9 ) {
+        if ( header_size < MAX_FRAME_HEADER_SIZE ) {
             // Payload length data is incomplete
             return read;
         }
-        uint64_t s;
+        uint64_t s = 0;
         memcpy(&s, client->current_header+1, 8);
         frame->payload_size = ntohll(s);
     }
@@ -209,40 +213,41 @@ void handle_close_frame(Client *client, uint8_t *data) {
     if ( payload_size == 0 ) {
         send_close_status(client, NORMAL);
         return;
-    } else if ( payload_size == 1 ) {
+    } 
+    
+    if ( payload_size == 1 ) {
         send_close_status(client, PROTOCOL_ERROR);
         return;
     }
-    else {
-        uint16_t status_code;
-        memcpy(&status_code, data, 2);
-        status_code = ntohs(status_code);
-        printf("Received close frame with status %d\n", status_code);
-        int16_t new_status_code = get_reply_code(status_code);
-        // -1 implies an invalid status code, more than 0 means a new code is
-        // sent. 0 means that the same code should be echoed back. Only greater
-        // than 0 requires a copy, since an echo means the code is already in
-        // the data.
-        if ( new_status_code == -1 ) {
-            send_close_status(client, 0);
-            return;
-        } else if ( new_status_code > 0 ) {
-            new_status_code = htons(new_status_code);
-            memcpy(data, &new_status_code, 2);
-        }
+    uint16_t status_code = 0;
+    memcpy(&status_code, data, 2);
+    status_code = ntohs(status_code);
+    printf("Received close frame with status %d\n", status_code);
+    int16_t new_status_code = get_reply_code(status_code);
+    // -1 implies an invalid status code, more than 0 means a new code is
+    // sent. 0 means that the same code should be echoed back. Only greater
+    // than 0 requires a copy, since an echo means the code is already in
+    // the data.
+    if ( new_status_code == -1 ) {
+        send_close_status(client, 0);
+        return;
+    } 
+    if ( new_status_code > 0 ) {
+        new_status_code = htons(new_status_code);
+        memcpy(data, &new_status_code, 2);
+    }
 
-        // Validate utf-8
-        bool is_valid = validate_utf8((char *)data+2, payload_size-2);
-        if ( !is_valid ) {
-            send_close_status(client, INVALID_ENCODING);
-            return;
-        }
+    // Validate utf-8
+    bool is_valid = validate_utf8((char *)data+2, payload_size-2);
+    if ( !is_valid ) {
+        send_close_status(client, INVALID_ENCODING);
+        return;
     }
     send_close_frame(client, data, payload_size);
 }
 
 int16_t get_reply_code(uint16_t status_code) {
-    int16_t reply;
+    int16_t reply = 0;
     /**
      * We return normal if code is away, for defined and valid codes, we return
      * 0 to avoid unnecessary copies. For others, we return -1 to send an empty
@@ -270,7 +275,7 @@ int16_t get_reply_code(uint16_t status_code) {
 
 int8_t handle_control_frame(Client *client, uint8_t buf[], int size) {
     int8_t read = 0;
-    uint8_t *data;
+    uint8_t *data = NULL;
     Frame *frame = &client->control_frame;
 
     // Avoid unnecessary copies and allocations. We can use the buf directly.
@@ -299,9 +304,13 @@ int8_t handle_control_frame(Client *client, uint8_t buf[], int size) {
     if ( frame->type == CLOSE ) {
         handle_close_frame(client, data);
         return -1;
-    } else if ( frame->type == PING ) {
+    }
+    
+    if ( frame->type == PING ) {
         bool is_sent = send_pong_frame(client, data, frame->payload_size);
-        if ( !is_sent ) return -1;
+        if ( !is_sent ) {
+            return -1;
+        }
     } else if ( frame->type == PONG ) {
         printf("Received pong frame");
     }
@@ -321,6 +330,7 @@ int64_t handle_data_frame(Client *client, uint8_t buf[], int size) {
     int64_t read = 0;
     Frame *frame = &client->data_frame;
     uint8_t *data = frame->buffer;
+    uint8_t *temp;
 
     // Avoid unnecessary copies and allocations. We can use the buf directly.
     // If size of buffer is less than payload size, the data needs to be copied
@@ -352,7 +362,12 @@ int64_t handle_data_frame(Client *client, uint8_t buf[], int size) {
             }
             frame->buffer_size += remaining_space;
             frame->buffer_size = (frame->buffer_size + BUFFER_SIZE - 1) & ~(BUFFER_SIZE - 1); // Round to a multiple of buffer size
-            frame->buffer = (uint8_t *)realloc(frame->buffer, frame->buffer_size);
+            temp = (uint8_t *)realloc(frame->buffer, frame->buffer_size);
+            if ( temp == NULL ) {
+                send_close_status(client, TOO_LARGE);
+                return -1;
+            }
+            frame->buffer = temp;
             data = frame->buffer;
         }
         uint64_t to_copy_size = frame->payload_size - (frame->filled_size - frame->current_fragment_offset);
@@ -375,7 +390,8 @@ int64_t handle_data_frame(Client *client, uint8_t buf[], int size) {
     }
     
     if ( frame->is_final ) {
-        bool is_valid, was_written = false;
+        bool is_valid = false;
+        bool was_written = false;
         if ( frame->type == TEXT && client->indices_count == 0 ) {
             if ( data == buf ) {
                 is_valid = validate_utf8((char *)data, frame->payload_size);
@@ -390,7 +406,7 @@ int64_t handle_data_frame(Client *client, uint8_t buf[], int size) {
         } else if ( client->indices_count > 0 ) {
             uint8_t *output = NULL;
             uint64_t output_length = 0;
-            Extension *extension;
+            Extension *extension = NULL;
             if ( data == buf ) {
                 frame->buffer = data;
                 frame->buffer_size = frame->payload_size;
@@ -424,7 +440,9 @@ int64_t handle_data_frame(Client *client, uint8_t buf[], int size) {
             data = frame->buffer;
         }
         bool is_sent = send_data_frame(client, data);
-        if ( !is_sent ) return -1;
+        if ( !is_sent ) {
+            return -1;
+        }
     }
     else {
         // Reset client struct without freeing buffer because this is a part of other frames.
@@ -464,12 +482,10 @@ void send_close_status(Client *client, Status_code code) {
 }
 
 void send_close_frame(Client *client, uint8_t *message, uint8_t size) {
-    uint8_t frame[size + 2], payload_size;
-    uint8_t first_byte;
-    first_byte = 128;
+    uint8_t frame[size + 2];
+    uint8_t payload_size = (MAX_PAYLOAD_VALUE & size);
+    uint8_t first_byte = 128;
     first_byte |= CLOSE;
-    payload_size = 0;
-    payload_size |= (127 & size);
     memcpy(frame, &first_byte, 1);
     memcpy(frame+1, &payload_size, 1);
     memcpy(frame+2, message, size);
@@ -477,12 +493,10 @@ void send_close_frame(Client *client, uint8_t *message, uint8_t size) {
 }
 
 bool send_pong_frame(Client *client, uint8_t *message, uint8_t size) {
-    uint8_t frame[size + 2], payload_size;
-    uint8_t first_byte;
-    first_byte = 128;
+    uint8_t frame[size + 2];
+    uint8_t payload_size = (MAX_PAYLOAD_VALUE & size);
+    uint8_t first_byte = 128;
     first_byte |= PONG;
-    payload_size = 0;
-    payload_size |= (127 & size);
     memcpy(frame, &first_byte, 1);
     memcpy(frame+1, &payload_size, 1);
     memcpy(frame+2, message, size);
@@ -490,12 +504,10 @@ bool send_pong_frame(Client *client, uint8_t *message, uint8_t size) {
 }
 
 bool send_ping_frame(Client *client, uint8_t *message, uint8_t size) {
-    uint8_t frame[size + 2], payload_size;
-    uint8_t first_byte;
-    first_byte = 128;
+    uint8_t frame[size + 2];
+    uint8_t payload_size = (MAX_PAYLOAD_VALUE & size);
+    uint8_t first_byte = 128;
     first_byte |= PING;
-    payload_size = 0;
-    payload_size |= (127 & size);
     frame[0] = first_byte;
     frame[1] = payload_size;
     memcpy(frame+2, message, size);
@@ -503,9 +515,12 @@ bool send_ping_frame(Client *client, uint8_t *message, uint8_t size) {
 }
 
 bool send_data_frame(Client *client, uint8_t *message) {
-    uint8_t payload_size, size_length, *final_frame;
-    uint8_t first_byte;
-    uint64_t size, output_size;
+    uint8_t payload_size = 0;
+    uint8_t size_length = 0;
+    uint8_t first_byte = 128;
+    uint8_t *final_frame = NULL;
+    uint64_t size = 0;
+    uint64_t output_size = 0;
     Frame *frame = &client->data_frame;
     Extension *extension;
     if ( frame->buffer_size == 0 ) {
@@ -514,7 +529,6 @@ bool send_data_frame(Client *client, uint8_t *message) {
     else {
         size = frame->filled_size;
     }
-    first_byte = 128;
     for ( uint8_t i = 0; i < client->indices_count; i++ ) {
         extension = get_extension(client->extension_indices[i]);
             if ( extension == NULL ) {
@@ -537,16 +551,14 @@ bool send_data_frame(Client *client, uint8_t *message) {
         first_byte |= (client->output_frame.rsv3 << 4);
     }
     first_byte |= frame->type;
-    payload_size = 0;
-    size_length = 0;
-    if ( size <= 125 ) {
-        payload_size |= (127 & size);
-    } else if ( size < 65536 ) {
-        payload_size |= 126;
+    if ( size <= (MAX_PAYLOAD_VALUE-2) ) {
+        payload_size |= (MAX_PAYLOAD_VALUE & size);
+    } else if ( size <= UINT16_MAX ) {
+        payload_size |= (MAX_PAYLOAD_VALUE-1);
         size_length = 2;
     }
     else {
-        payload_size |= 127;
+        payload_size |= MAX_PAYLOAD_VALUE;
         size_length = 8;
     }
     final_frame = (uint8_t *) malloc(2 + size_length + size);

@@ -1,7 +1,7 @@
 #include <ctype.h>
 #include <stdbool.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "header.h"
@@ -10,7 +10,9 @@
 int16_t move_to_next_line(char *start) {
     char *p = start;
     // Look for carriage return
-    while ( *p != '\r' ) p++;
+    while ( *p != '\r' ) {
+        p++;
+    }
     // Invalid header if it isn't followed by '\n'
     if ( *p != '\r' && *(p+1) != '\n' ) {
         return -1;
@@ -28,11 +30,11 @@ int16_t is_upgrade_header_valid(int socketfd, char *start) {
         p++;
     }
     if ( *p == '\0' || *p == '\r' || *p == '\n' ) {
-        send_error_response(socketfd, 400, "Invalid Upgrade header");
+        send_error_response(socketfd, CLIENT_ERROR, "Invalid Upgrade header");
         return -1;
     }
     if ( strncasecmp(p, "websocket", 9) != 0 ) {
-        send_error_response(socketfd, 400, "Invalid Upgrade header value");
+        send_error_response(socketfd, CLIENT_ERROR, "Invalid Upgrade header value");
         return -1;
     }
     p += 9;
@@ -40,17 +42,18 @@ int16_t is_upgrade_header_valid(int socketfd, char *start) {
 }
 
 int16_t get_sec_websocket_key_value(int socketfd, char *start, uint8_t key[]) {
-    char c;
+    char c = '\0';
     char *p = start;
+    int key_length = 22;
     while ( *p == ' ' || *p == '\t' ) {
         p++;
     }
     if ( *p == '\0' || *p == '\r' || *p == '\n' ) {
-        send_error_response(socketfd, 400, "Invalid Sec-Websocket-Key header");
+        send_error_response(socketfd, CLIENT_ERROR, "Invalid Sec-Websocket-Key header");
         return -1;
     }
     int i = 0;
-    while ( i < 22 && *p != '\0' ) {
+    while ( i < key_length && *p != '\0' ) {
         c = *p;
         // Allow only valid base64 characters for the first 22 characters
         if ( !isalnum(c) && c != '+' && c != '/' ) {
@@ -60,19 +63,19 @@ int16_t get_sec_websocket_key_value(int socketfd, char *start, uint8_t key[]) {
         i++;
         p++;
     }
-    if ( i < 22 ) {
-        send_error_response(socketfd, 400, 
+    if ( i < key_length ) {
+        send_error_response(socketfd, CLIENT_ERROR, 
                             "Invalid Sec-Websocket-Key header value");
         return -1;
     }
     // Valid Sec-Websocket-Key value must end with 2 '=' characters
     if ( *p != '=' || *(p+1) != '=' ) {
-        send_error_response(socketfd, 400, 
+        send_error_response(socketfd, CLIENT_ERROR, 
                             "Invalid Sec-Websocket-Key header value");
         return -1;
     }
-    key[22] = '=';
-    key[23] = '=';
+    key[key_length] = '=';
+    key[key_length+1] = '=';
     p += 2;
     return p - start;
 }
@@ -83,12 +86,12 @@ int16_t is_version_header_valid(int socketfd, char *start) {
         p++;
     }
     if ( *p == '\0' || *p == '\r' || *p == '\n' ) {
-        send_error_response(socketfd, 400,
+        send_error_response(socketfd, CLIENT_ERROR,
                             "Invalid Sec-Websocket-Version header");
         return -1;
     }
     if ( strncasecmp(p, "13", 2) != 0 ) {
-        send_error_response(socketfd, 400,
+        send_error_response(socketfd, CLIENT_ERROR,
                             "Invalid Sec-Websocket-Version header value");
         return -1;
     }
@@ -105,7 +108,7 @@ int16_t get_subprotocols(int socketfd, char *start, char subprotocol[],
 
     // Check that the value doesn't start with a comma or is empty.
     if ( *p == '\0' || *p == '\r' || *p == '\n' || *p == ',') {
-        send_error_response(socketfd, 400,
+        send_error_response(socketfd, CLIENT_ERROR,
                             "Invalid Sec-Websocket-Protocol header");
         return -1;
     }
@@ -129,27 +132,32 @@ int16_t parse_extensions(int socketfd, char *line,
         p++;
     }
     if ( *p == '\0' || *p == '\r' || *p == '\n' || *p == ',' || *p == ';') {
-        send_error_response(socketfd, 400, error);
+        send_error_response(socketfd, CLIENT_ERROR, error);
         return -1;
     }
     char *start = NULL;
-    int8_t i, key_length, length = 0;
-    bool is_digit, has_extension = false;
-    char c, key[EXTENSION_TOKEN_LENGTH+1];
-    ExtensionParam *prev_params, *current_params = NULL;
+    int8_t i = 0;
+    int8_t key_length = 0;
+    int8_t length = 0;
+    bool is_digit = false;
+    bool has_extension = false;
+    char c = '\0';
+    char key[EXTENSION_TOKEN_LENGTH+1];
+    ExtensionParam *prev_params = NULL;
+    ExtensionParam *current_params = NULL;
     while ( *p != '\0' && *p != '\r' && *p != '\n' ) {
         c = *p;
         if ( c == '"' ) {
             IN_QUOTE = !IN_QUOTE;
-        } else if ( !has_extension && ( c == ' ' || c == '\t') && start == NULL && !IN_QUOTE ) {
+        } else if ( ( c == ' ' || c == '\t') && start == NULL && !IN_QUOTE ) {
             p++;
             continue;
         } else if ( !has_extension && length == 0 && (c == ',' || c == ';') && !IN_QUOTE ) {
-            send_error_response(socketfd, 400, error);
+            send_error_response(socketfd, CLIENT_ERROR, error);
             return -1;
         } else if ( !has_extension && ( c == ';' || c == ',') && !IN_QUOTE && start != NULL ) {
             if ( length > EXTENSION_TOKEN_LENGTH ) {
-                send_error_response(socketfd, 400, error);
+                send_error_response(socketfd, CLIENT_ERROR, error);
                 return -1;
             }
             strncpy(key, start, length);
@@ -158,7 +166,7 @@ int16_t parse_extensions(int socketfd, char *line,
             length = 0;
             current_params = get_extension_params(extension_list, key, true);
             if ( current_params == NULL ) {
-                send_error_response(socketfd, 400, error);
+                send_error_response(socketfd, CLIENT_ERROR, error);
                 return -1;
             }
             while ( current_params != NULL && current_params->value_type != EMPTY ) {
@@ -178,7 +186,7 @@ int16_t parse_extensions(int socketfd, char *line,
             }
         } else if ( has_extension && (c == ',' || c == ';' || c == '=') && !IN_QUOTE && start != NULL ) {
             if ( length > EXTENSION_TOKEN_LENGTH ) {
-                send_error_response(socketfd, 400, error);
+                send_error_response(socketfd, CLIENT_ERROR, error);
                 return -1;
             }
             if ( current_params->value_type != EMPTY ) {
@@ -223,9 +231,6 @@ int16_t parse_extensions(int socketfd, char *line,
             }
             start = NULL;
             length = 0;
-        }  else if ( has_extension && ( c == ' ' || c == '\t') && start == NULL && !IN_QUOTE ) {
-            p++;
-            continue;
         } else {
             if ( start == NULL ) {
                 start = p;
@@ -233,13 +238,12 @@ int16_t parse_extensions(int socketfd, char *line,
             length++;
         }
         p++;
-        continue;
     }
     if ( start == NULL || IN_QUOTE ) {
          return p - line;
     }
     if ( length > EXTENSION_TOKEN_LENGTH ) {
-        send_error_response(socketfd, 400, error);
+        send_error_response(socketfd, CLIENT_ERROR, error);
         return -1;
     }
     if ( !has_extension ) {
@@ -247,7 +251,7 @@ int16_t parse_extensions(int socketfd, char *line,
         key[length] = '\0';
         current_params = get_extension_params(extension_list, key, true);
         if ( current_params == NULL ) {
-            send_error_response(socketfd, 400, error);
+            send_error_response(socketfd, CLIENT_ERROR, error);
             return -1;
         }
         while ( current_params != NULL && current_params->value_type != EMPTY ) {
@@ -298,9 +302,9 @@ int16_t parse_extensions(int socketfd, char *line,
 bool validate_headers(char buf[], uint16_t request_length, int socketfd, uint8_t key[], char subprotocol[],
                       int subprotocol_len, uint8_t **extension_indices,
                       uint8_t *indices_count) {
-    char *p;
-    int8_t index;
-    int16_t progress;
+    char *p = NULL;
+    int8_t index = 0;
+    int16_t progress = 0;
     char *headers[] = {"Host:", "Upgrade:", "Sec-Websocket-Key:",           
                        "Sec-Websocket-Version:", "Sec-Websocket-Protocol:", 
                        "Sec-Websocket-Extensions:"};
@@ -312,6 +316,7 @@ bool validate_headers(char buf[], uint16_t request_length, int socketfd, uint8_t
     while ( *p != '\0' && (p - buf) < request_length && 
             *p != '\r' && *p != '\n' ) {
         for ( index = 0; index < header_count && (p - buf) < request_length; index++ ) {
+            progress = 0;
             if ( index < 4 && required_headers_present[index] ) {
                 continue;
             }
@@ -322,53 +327,49 @@ bool validate_headers(char buf[], uint16_t request_length, int socketfd, uint8_t
             if ( index == 0 ) {
                 // Host is available. That's all we want to know
                 required_headers_present[index] = true;
-                break;
             } else if ( index == 1 ) {
-                if ( (progress = is_upgrade_header_valid(socketfd, p)) == -1 ) {
+                progress = is_upgrade_header_valid(socketfd, p);
+                if ( progress == -1 ) {
                     is_valid = false;
                     break;
                 }
-                p += progress;
                 required_headers_present[index] = true;
-                break;
             } else if ( index == 2 ) {
-                if ( (progress = get_sec_websocket_key_value(socketfd, p, key)) == -1){
+                progress = get_sec_websocket_key_value(socketfd, p, key);
+                if ( progress == -1){
                     is_valid = false;
                     break;
                 }
-                p += progress;
                 required_headers_present[index] = true;
-                break;
             } else if ( index == 3 ) {
-                if ( (progress = is_version_header_valid(socketfd, p)) == -1) {
+                progress = is_version_header_valid(socketfd, p);
+                if ( progress == -1) {
                     is_valid = false;
                     break;
                 }
-                p += progress;
                 required_headers_present[index] = true;
-                break;
             } else if ( index == 4 ) {
-                if ( (progress = get_subprotocols(socketfd, p, subprotocol,
-                                        &subprotocol_len)) == -1) {
+                progress = get_subprotocols(socketfd, p, subprotocol, &subprotocol_len);
+                if ( progress == -1) {
                     is_valid = false;
                     break;
                 }
-                p += progress;
-                break;
             } else {
-                if ( (progress = parse_extensions(socketfd, p, list)) == -1) {
+                progress = parse_extensions(socketfd, p, list);
+                if ( progress == -1) {
                     is_valid = false;
                     break;
                 }
-                p += progress;
                 break;
             }
+            p += progress;
         }
         if ( !is_valid ) {
             delete_extension_list(socketfd);
             return is_valid;
         }
-        if ( (progress = move_to_next_line(p)) == -1 ) {
+        progress = move_to_next_line(p);
+        if ( progress == -1 ) {
             return false;
         }
         p += progress;

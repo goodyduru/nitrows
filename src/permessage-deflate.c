@@ -1,6 +1,7 @@
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <zlib.h>
 
 #include "permessage-deflate.h"
 
@@ -13,7 +14,8 @@ void pmd_add_to_table(PMDClientConfig *config) {
 
 void pmd_delete_from_table(int socketfd) {
     int index = socketfd % HASHTABLE_SIZE;
-    PMDClientConfig *prev, *config = pmd_config_table[index];
+    PMDClientConfig *prev;
+    PMDClientConfig *config = pmd_config_table[index];
     if ( config == NULL ) {
         return;
     }
@@ -132,7 +134,9 @@ bool pmd_validate_offer(int socketfd, ExtensionParam* param) {
             config->server_no_context_takeover = server_no_context_takeover;
             pmd_add_to_table(config);
             break;
-        } else if ( !acceptable && param->is_last && param->next != NULL ) {
+        }
+        
+        if ( !acceptable && param->is_last && param->next != NULL ) {
             has_seen_server_context_takeover = false;
             has_seen_client_context_takeover = false;
             has_seen_client_max_window_bits = false;
@@ -196,11 +200,13 @@ bool pmd_process_data(int socketfd, Frame* frame, uint8_t **output,
         config->inflater->avail_in = 0;
         config->inflater->next_in = Z_NULL;
         ret = inflateInit2(config->inflater, -config->client_max_window_bits);
-        if ( ret != Z_OK )
+        if ( ret != Z_OK ) {
             return false;
+        }
     }
     z_stream *inflater = config->inflater;
     uint8_t *out = *output;
+    uint8_t *temp;
     uint64_t length = *output_length;
     uint64_t input_size = 0;
     uint64_t written = 0;
@@ -219,7 +225,12 @@ bool pmd_process_data(int socketfd, Frame* frame, uint8_t **output,
         }
         else {
             length *= 2;
-            out = realloc(out, length);
+            temp = realloc(out, length);
+            if ( temp == NULL ) {
+                free(out);
+                return 0;
+            }
+            out = temp;
         }
         inflater->avail_out = length - written;
         inflater->next_out = out+written;
@@ -228,7 +239,12 @@ bool pmd_process_data(int socketfd, Frame* frame, uint8_t **output,
         if ( ret == Z_STREAM_END || (ret == Z_OK && inflater->avail_out > 0) ) {
             if ( inflater->avail_out < 8 ) {
                 length += 8; // This should be more than enough
-                out = realloc(out, length);
+                temp = realloc(out, length);
+                if ( temp == NULL ) {
+                    free(out);
+                    return 0;
+                }
+                out = temp;
             }
             inflater->avail_out = length - written;
             inflater->next_out = out+written;
@@ -266,12 +282,14 @@ uint64_t pmd_generate_response(int socketfd, uint8_t* input,
         config->deflater->opaque = Z_NULL;
         ret = deflateInit2(config->deflater, Z_DEFAULT_COMPRESSION, 
         Z_DEFLATED, -config->server_max_window_bits, 8, Z_DEFAULT_STRATEGY);
-        if ( ret != Z_OK )
+        if ( ret != Z_OK ) {
             return 0;
+        }
     }
     z_stream *deflater = config->deflater;
     uint64_t written = 0;
     uint8_t *out = NULL;
+    uint8_t *temp;
     uint64_t length;
     deflater->avail_in = input_length;
     deflater->next_in = input;
@@ -283,7 +301,12 @@ uint64_t pmd_generate_response(int socketfd, uint8_t* input,
         }
         else {
             length *= 2;
-            out = realloc(out, length);
+            temp = realloc(out, length);
+            if ( temp == NULL ) {
+                free(out);
+                return 0;
+            }
+            out = temp;
         }
         deflater->avail_out = length - written;
         deflater->next_out = out+written;

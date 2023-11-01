@@ -1,14 +1,16 @@
-#ifndef INCLUDED_CLIENTS_DOT_H
-#define INCLUDED_CLIENTS_DOT_H
+#ifndef NITROWS_SRC_CLIENTS_H
+#define NITROWS_SRC_CLIENTS_H
 
 #include <stdbool.h>
 #include <stdint.h>
 
 #include "./defs.h"
 
-#define NO_FRAME -1
+#define NO_FRAME (-1)
 #define CONTROL_FRAME 0
 #define DATA_FRAME 1
+#define CONTROL_FRAME_BUFFER_SIZE 125
+#define MAX_FRAME_HEADER_SIZE 9
 
 typedef struct Frame Frame;
 
@@ -74,7 +76,7 @@ struct Client {
     // a buffer is less than this number, we store it in the `current_header` 
     // element and record the size in the `header_size` element.
     uint8_t header_size;
-    uint8_t current_header[9];
+    uint8_t current_header[MAX_FRAME_HEADER_SIZE];
 
     // Frame mask for the currently processed frame.
     uint8_t mask_size;
@@ -96,7 +98,7 @@ typedef struct Node Node;
  * the clients
  */
 struct Node {
-    // TODO: Test this with and without this member for performance comparision.
+    // TODO(goody): Test this with and without this member for performance comparision.
     int client_socketfd;
 
     Client *client;
@@ -104,7 +106,7 @@ struct Node {
 };
 
 // Table containing all the connected clients.
-static Node *clients_table[HASHTABLE_SIZE];
+static Node* clients_table[HASHTABLE_SIZE];
 
 /**
  * Initialize a websocket client structure and add it to the client table.
@@ -133,11 +135,6 @@ Client *get_client(int socketfd);
  * @param client Pointer to client struct
  */
 void delete_client(Client *client);
-
-/**
- * Internal function, free client and its members.
- */
-void __free_client(Client *client);
 
 // For debugging purposes
 void print_client(Client *client);

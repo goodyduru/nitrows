@@ -30,7 +30,7 @@ static const uint8_t utf8d[] = {
   1,3,1,1,1,1,1,3,1,3,1,1,1,1,1,1,1,3,1,1,1,1,1,1,1,1,1,1,1,1,1,1, // s7..s8
 };
 
-bool validate_utf8(char *str, size_t len) {
+bool validate_utf8(const char *str, size_t len) {
    size_t i;
    uint32_t type;
    uint8_t state = UTF8_ACCEPT;
@@ -41,8 +41,9 @@ bool validate_utf8(char *str, size_t len) {
         type = utf8d[(uint8_t)str[i]];
         state = utf8d[256 + state * 16 + type];
 
-        if (state == UTF8_REJECT)
+        if (state == UTF8_REJECT) {
             break;
+        }
     }
 
     return state == UTF8_ACCEPT;

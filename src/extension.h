@@ -1,8 +1,8 @@
 /**
  * Websocket extension handling functions
  */
-#ifndef INCLUDED_EXTENSION_DOT_H
-#define INCLUDED_EXTENSION_DOT_H
+#ifndef NITROWS_SRC_EXTENSION_H
+#define NITROWS_SRC_EXTENSION_H
 
 #include <stdbool.h>
 #include <stdint.h>

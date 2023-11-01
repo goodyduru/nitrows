@@ -1,10 +1,12 @@
 /**
  * Websocket frame handling functions.
  */
-#ifndef INCLUDED_FRAME_DOT_H
-#define INCLUDED_FRAME_DOT_H
+#ifndef NITROWS_SRC_FRAME_H
+#define NITROWS_SRC_FRAME_H
 
 #include "clients.h"
+
+#define MAX_PAYLOAD_VALUE 127
 
 /**
  * Extracts a frame header and sets the necessary client struct members to them
@@ -47,7 +49,7 @@ bool are_rsv_bits_valid(bool rsv1, bool rsv2, bool rsv3);
  * 
  * @returns amount of bytes read
 */
-int8_t get_payload_data(Client *client, uint8_t buf[], int size);
+int8_t get_payload_data(Client *client, const uint8_t buf[], int size);
 
 /**
  * Handles the various types of control frames

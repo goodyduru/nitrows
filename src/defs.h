@@ -1,5 +1,5 @@
-#ifndef INCLUDED_DEFS_DOT_H
-#define INCLUDED_DEFS_DOT_H
+#ifndef NITROWS_SRC_DEFS_H
+#define NITROWS_SRC_DEFS_H
 
 /** 
  * Represents the string that is concatenated to the Sec-Websocket-Key received

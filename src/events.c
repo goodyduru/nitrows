@@ -1,5 +1,5 @@
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "./defs.h"
 #include "./events.h"
@@ -13,29 +13,33 @@ void init_event_loop() {
 void add_to_event_loop(int socketfd) {
     // If there's no more space, double the size of the event object array.
     if ( event.count == event.size ) {
+        struct pollfd *temp;
         event.size *= 2;
-        event.objects = realloc(event.objects, sizeof(struct pollfd) * event.size);
+        temp = realloc(event.objects, sizeof(struct pollfd) * event.size);
+        if ( temp != NULL ) {
+            event.objects = temp;
+        }
     }
     event.objects[event.count].fd = socketfd;
     event.objects[event.count].events = POLLIN;
     event.count++;
 }
 
-void delete_from_event_loop(int socketfd, int index) {
+void delete_from_event_loop(int socketfd) {
+    int index = -1;
     // If index is negative, we need to search for the object containing the
     // socket descriptor.
-    if ( index == -1 ) {
-        for ( int i = 0; i < event.count; i++ ) {
-            if ( event.objects[i].fd == socketfd ) {
-                index = i;
-                break;
-            }
+    for ( int i = 0; i < event.count; i++ ) {
+        if ( event.objects[i].fd == socketfd ) {
+            index = i;
+            break;
         }
     }
 
     // Socket wasn't found
-    if ( index == -1 )
+    if ( index == -1 ) {
         return;
+    }
     
     // Carry out delete by taking the last item and inserting it into the space
     // occupied by socketfd.
@@ -43,13 +47,18 @@ void delete_from_event_loop(int socketfd, int index) {
     event.count--;
 
     // We don't need to reduce size if it is INITIAL_EVENT_SIZE
-    if ( event.size == INITIAL_EVENT_SIZE )
+    if ( event.size == INITIAL_EVENT_SIZE ) {
         return;
+    }
     
     // Reduce size by half if number of items is below a third of the array size
     if ( event.count < event.size/3 ) {
+        struct pollfd *temp;
         event.size /= 2;
-        event.objects = realloc(event.objects, sizeof(struct pollfd) * event.size);
+        temp = realloc(event.objects, sizeof(struct pollfd) * event.size);
+        if ( temp != NULL ) {
+            event.objects = temp;
+        }
     }
 }
 
@@ -58,7 +67,7 @@ void run_event_loop(int listener, void (*handle_listener)(int),
     while(1) {
         int poll_count = poll(event.objects, event.count, -1);
         if ( poll_count == -1 ) {
-            perror("poll"); // TODO: change this
+            perror("poll"); // TODO(goody): change this
             exit(1); // Remove this
         }
 

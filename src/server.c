@@ -1,5 +1,7 @@
 #include "server.h"
 
+#include <errno.h>
+#include <fcntl.h>
 #include <openssl/sha.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -175,6 +177,8 @@ void handle_upgrade(int socketfd) {
   bool sent = __send_upgrade_response(socketfd, key, subprotocol, subprotocol_len, extension_indices, indices_count);
   if (sent == true) {
     init_client(socketfd, extension_indices, indices_count);
+    // Make socket non-blocking
+    fcntl(socketfd, F_SETFL, O_NONBLOCK);
   }
 }
 
@@ -246,6 +250,8 @@ void handle_client_data(Client *client) {
     if (nbytes == 0) {
       // Connection closed
       printf("Closed connection\n");
+    } else if (errno == EWOULDBLOCK || errno == EAGAIN) {
+      return;
     } else {
       perror("recv");
     }

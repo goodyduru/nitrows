@@ -34,7 +34,40 @@ void add_to_event_loop(int socketfd) {
 }
 
 void delete_from_event_loop(int socketfd) {
-  // Does nothing, for api consistency purpose.
+  int index = -1;
+  // If index is negative, we need to search for the object containing the
+  // socket descriptor.
+  for (int i = 0; i < nitrows_event.count; i++) {
+    if (nitrows_event.objects[i].ident == socketfd) {
+      index = i;
+      break;
+    }
+  }
+
+  // Socket wasn't found
+  if (index == -1) {
+    return;
+  }
+
+  // Carry out delete by taking the last item and inserting it into the space
+  // occupied by socketfd.
+  nitrows_event.objects[index] = nitrows_event.objects[nitrows_event.count - 1];
+  nitrows_event.count--;
+
+  // We don't need to reduce size if it is INITIAL_EVENT_SIZE
+  if (nitrows_event.size == INITIAL_EVENT_SIZE) {
+    return;
+  }
+
+  // Reduce size by half if number of items is below a third of the array size
+  if (nitrows_event.count < nitrows_event.size / 3) {
+    struct kevent *temp;
+    nitrows_event.size /= 2;
+    temp = realloc(nitrows_event.objects, sizeof(struct kevent) * nitrows_event.size);
+    if (temp != NULL) {
+      nitrows_event.objects = temp;
+    }
+  }
 }
 
 void run_event_loop(int listener, void (*handle_listener)(int), void (*handle_others)(int, bool)) {

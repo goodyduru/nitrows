@@ -245,10 +245,12 @@ bool pmd_process_data(int socketfd, Frame *frame, uint8_t **output, uint64_t *ou
       inflater->next_in = (uint8_t *)TRAILER;
       ret = inflate(inflater, Z_NO_FLUSH);
       if (ret != Z_STREAM_END && ret != Z_OK) {
+        free(out);
         return false;
       }
       written = length - inflater->avail_out;
     } else if (ret != Z_OK && ret != Z_BUF_ERROR) {
+      free(out);
       return false;
     }
   } while (inflater->avail_out == 0);
@@ -304,6 +306,7 @@ uint64_t pmd_generate_response(int socketfd, uint8_t *input, uint64_t input_leng
     ret = deflate(deflater, Z_SYNC_FLUSH);
     written = length - deflater->avail_out;
     if (ret != Z_OK && ret != Z_STREAM_END) {
+      free(out);
       return 0;
     }
   } while (deflater->avail_out == 0);

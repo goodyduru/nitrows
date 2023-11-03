@@ -410,6 +410,9 @@ int64_t handle_data_frame(Client *client, uint8_t buf[], int size) {
         }
         is_valid = extension->process_data(client->socketfd, frame, &output, &output_length);
         if (!is_valid) {
+          if ( data == buf ) {
+            frame->buffer = NULL;
+          }
           send_close_status(client, INVALID_EXTENSION);
           return -1;
         }

@@ -3,7 +3,9 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#ifdef __APPLE__
+#ifdef __linux__
+#include <sys/epoll.h>
+#elif defined(__unix__) || defined(__APPLE__)
 #include <sys/event.h>
 #include <sys/types.h>
 #else
@@ -26,7 +28,11 @@ typedef struct Event Event;
  * descriptors that we are interested in. It will also hold metadata
  * that will give us the size and count of the array.
  */
-#ifdef __APPLE__
+#ifdef __linux__
+struct Event {
+  struct epoll_event objects[INITIAL_EVENT_SIZE];
+} static int epollfd;
+#elif defined(__unix__) || defined(__APPLE__)
 struct Event {
   uint64_t count;
   uint64_t size;

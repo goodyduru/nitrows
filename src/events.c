@@ -3,7 +3,54 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#ifdef __APPLE__
+#ifdef __linux__
+void init_event_loop() {
+  epollfd = epoll_create1(0);
+  if (epollfd == -1) {
+    perror("epoll_create1");
+    exit(1);
+  }
+}
+
+void add_to_event_loop(int socketfd) {
+  struct epoll_event ev;
+  ev.events = EPOLLIN | EPOLLET;
+  ev.data.fd = socketfd;
+  if (epoll_ctl(epollfd, EPOLL_CTL_ADD, socketfd, &ev) == -1) {
+    perror("epoll_ctl: socketfd");
+  }
+}
+
+void delete_from_event_loop(int socketfd) {
+  if (epoll_ctl(epollfd, EPOLL_CTL_DEL, socketfd, NULL) == -1) {
+    perror("epoll_ctl: socketfd");
+  }
+}
+
+void run_event_loop(int listener, void (*handle_listener)(int), void (*handle_others)(int, bool)) {
+  struct epoll_event curr_event;
+  while (1) {
+    int event_count = epoll_wait(epollfd, nitrows_event.objects, INITIAL_EVENT_SIZE, -1);
+    if (event_count == -1) {
+      perror("epoll_wait");  // TODO(goody): change this
+      exit(1);               // Remove this
+    }
+
+    for (int i = 0; i < event_count; i++) {
+      curr_event = nitrows_event.objects[i];
+      if (curr_event.data.fd == listener) {
+        handle_listener(listener);
+      } else {
+        if (curr_event.events & EPOLLIN) {
+          handle_others(curr_event.data.fd, false);
+        } else if ((curr_event.events & EPOLLHUP) || (curr_event.events & EPOLLERR)) {
+          handle_others(curr_event.data.fd, true);
+        }
+      }
+    }
+  }
+}
+#elif defined(__unix__) || defined(__APPLE__)
 void init_event_loop() {
   kq = kqueue();
   if (kq == -1) {

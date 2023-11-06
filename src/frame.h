@@ -129,5 +129,5 @@ bool send_ping_frame(Client *client, uint8_t *message, uint8_t size);
  *
  * @returns true if successful, else false
  */
-bool send_data_frame(Client *client, uint8_t *message);
+bool send_data_frame(int socketfd, uint8_t *message, uint64_t size);
 #endif

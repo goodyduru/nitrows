@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 #include "extension.h"
+#include "handlers.h"
 #include "server.h"
 #include "utf8.h"
 
@@ -433,7 +434,15 @@ int64_t handle_data_frame(Client *client, uint8_t buf[], int size) {
     if (was_written) {
       data = frame->buffer;
     }
-    bool is_sent = send_data_frame(client, data);
+
+    uint64_t length;
+    NitrowsHandler *handler = get_handlers();
+    if (frame->buffer_size == 0) {
+      length = frame->payload_size;
+    } else {
+      length = frame->filled_size;
+    }
+    bool is_sent = handler->handle_message(client->socketfd, data, length);
     if (!is_sent) {
       return -1;
     }
@@ -507,20 +516,15 @@ bool send_ping_frame(Client *client, uint8_t *message, uint8_t size) {
   return send_frame(client, frame, size + 2);
 }
 
-bool send_data_frame(Client *client, uint8_t *message) {
+bool send_data_frame(int socketfd, uint8_t *message, uint64_t size) {
+  Client *client = get_client(socketfd);
   uint8_t payload_size = 0;
   uint8_t size_length = 0;
   uint8_t first_byte = 128;
   uint8_t *final_frame = NULL;
-  uint64_t size = 0;
   uint64_t output_size = 0;
   Frame *frame = &client->data_frame;
   Extension *extension;
-  if (frame->buffer_size == 0) {
-    size = frame->payload_size;
-  } else {
-    size = frame->filled_size;
-  }
   for (uint8_t i = 0; i < client->indices_count; i++) {
     extension = get_extension(client->extension_indices[i]);
     if (extension == NULL) {

@@ -3,23 +3,13 @@
 
 #include "events.h"
 #include "extension.h"
+#include "frame.h"
+#include "handlers.h"
 #include "net.h"
+#include "nitrows.h"
 #include "permessage-deflate.h"
 #include "server.h"
 
-/**
- * This function registers Sec-Websocket-Extensions handlers for different points of processing data from accepting
- * connection to responding with data.
- *
- * @param key: header key to identify extension e.g permessage-deflate
- * @param accept_offer: Handler for accepting extension parameters
- * @param respond_to_offer: Handler for generating a response to a negotiation
- * offer.
- * @param validate_rsv: Handler for validating a frame's rsv
- * @param process_data: Handler for processing client request.
- * @param close: Handler for closing and releasing resources associated with a
- * client.
- */
 void nitrows_register_extension(char *key, bool (*validate_offer)(int, ExtensionParam *),
                                 uint16_t (*respond_to_offer)(int, char *),
                                 bool (*process_data)(int, Frame *, uint8_t **, uint64_t *),
@@ -27,7 +17,15 @@ void nitrows_register_extension(char *key, bool (*validate_offer)(int, Extension
   register_extension(key, validate_offer, respond_to_offer, process_data, generate_data, close);
 }
 
-int main() {
+void nitrows_set_message_handler(bool (*handle_message)(int, uint8_t *, uint64_t)) {
+  set_message_handler(handle_message);
+}
+
+bool nitrows_send_message(int key, uint8_t *message, uint64_t length) {
+  return send_data_frame(key, message, length);
+}
+
+void nitrows_run() {
   nitrows_register_extension("permessage-deflate", pmd_validate_offer, pmd_respond, pmd_process_data,
                              pmd_generate_response, pmd_close);
   int listener_socket = get_listener_socket();

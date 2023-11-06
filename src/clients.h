@@ -88,6 +88,11 @@ struct Client {
   Frame data_frame;
 
   Frame output_frame;
+
+  // Socket is non-blocking. We need a place to store data to be sent until it's sent.
+  uint64_t send_buffer_size;
+  uint64_t send_start;
+  uint8_t *send_buffer;
 };
 
 typedef struct Node Node;

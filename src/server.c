@@ -17,7 +17,7 @@
 #include "frame.h"
 #include "header.h"
 
-void handle_connection(int socketfd, bool is_close) {
+void handle_connection(int socketfd, bool is_send, bool is_close) {
   Client *client = get_client(socketfd);
   if (client == NULL) {
     // If a client is not in the table, then it is probably initiating the websocket protocol by sending a connection
@@ -26,10 +26,12 @@ void handle_connection(int socketfd, bool is_close) {
   } else {
     // A client found in the table is more likely sending a frame. This calls the function that handles the frame
     // request.
-    if (is_close) {
-      close_client(client);
-    } else {
+    if (!is_send && !is_close) {
       handle_client_data(client);
+    } else if (is_send) {
+      send_frame(client, NULL, -1);
+    } else {
+      close_client(client);
     }
   }
 }
@@ -261,11 +263,81 @@ void handle_client_data(Client *client) {
 }
 
 bool send_frame(Client *client, uint8_t *frame, uint64_t size) {
+  if (frame == NULL && client->send_buffer == NULL) {
+    return true;
+  }
+  ssize_t total_size;
   ssize_t bytes_sent;
-  ssize_t total_bytes_sent = 0;
-  while ((bytes_sent = send(client->socketfd, frame + total_bytes_sent, size - total_bytes_sent, 0)) > 0) {
+  ssize_t total_bytes_sent;
+  uint8_t *buf = NULL;
+  if (client->send_buffer != NULL) {
+    total_bytes_sent = client->send_start;
+    total_size = client->send_buffer_size;
+
+    if (frame != NULL) {
+      total_size = total_size - total_bytes_sent;
+      if (total_bytes_sent == 0) {
+        buf = realloc(client->send_buffer, total_size + size);
+        if (buf != NULL) {
+          client->send_buffer = buf;
+          memcpy(client->send_buffer + total_size, frame, size);
+          client->send_buffer_size = total_size + size;
+        }
+      } else {
+        buf = malloc(total_size + size);
+        if (buf != NULL) {
+          memcpy(buf, client->send_buffer + total_bytes_sent, total_size);
+          memcpy(buf + total_size, frame, size);
+          free(client->send_buffer);
+          client->send_buffer = buf;
+          client->send_start = total_bytes_sent = 0;
+          client->send_buffer_size = total_size + size;
+        }
+      }
+      total_size = client->send_buffer_size;
+    }
+    buf = client->send_buffer;
+  } else {
+    buf = frame;
+    total_size = size;
+    total_bytes_sent = 0;
+  }
+
+  while (total_size > total_bytes_sent) {
+    bytes_sent = send(client->socketfd, buf + total_bytes_sent, total_size - total_bytes_sent, 0);
+    if (bytes_sent == 0) {
+      return false;
+    }
+    if (bytes_sent < 0) {
+      break;
+    }
     total_bytes_sent += bytes_sent;
   }
 
-  return (bytes_sent == 0);
+  if (total_bytes_sent == total_size) {
+    if (client->send_buffer == NULL) {
+      return true;
+    }
+    free(client->send_buffer);
+    client->send_buffer = NULL;
+    client->send_start = 0;
+    client->send_buffer_size = 0;
+    set_write_notify(client->socketfd, false);
+    return true;
+  }
+
+  if (errno == EAGAIN || errno == EWOULDBLOCK) {
+    if (client->send_buffer != NULL) {
+      client->send_start = total_bytes_sent;
+    } else {
+      set_write_notify(client->socketfd, true);
+      client->send_start = 0;
+      client->send_buffer_size = total_size - total_bytes_sent;
+      client->send_buffer = malloc(client->send_buffer_size);
+      memcpy(client->send_buffer, buf + total_bytes_sent, total_size - total_bytes_sent);
+    }
+  } else {
+    return false;
+  }
+  return true;
 }

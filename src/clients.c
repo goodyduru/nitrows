@@ -66,15 +66,18 @@ void __free_client(Client *client) {
   if (client->output_frame.buffer != NULL) {
     free(client->output_frame.buffer);
   }
+  if (client->send_buffer != NULL) {
+    free(client->send_buffer);
+  }
 
-  if ( client->indices_count > 0 ) {
+  if (client->indices_count > 0) {
     Extension *extension;
     for (uint8_t i = 0; i < client->indices_count; i++) {
-        extension = get_extension(client->extension_indices[i]);
-        if (extension == NULL) {
-          continue;
-        }
-        extension->close(client->socketfd);
+      extension = get_extension(client->extension_indices[i]);
+      if (extension == NULL) {
+        continue;
+      }
+      extension->close(client->socketfd);
     }
     free(client->extension_indices);
   }

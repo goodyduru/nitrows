@@ -8,13 +8,14 @@
 #include "clients.h"
 /**
  * A generic function that will handle connection from clients. Socket desc owned by a client in the table will be
- * handled by data frame function, those that are aren't will have their connection upgraded. It closes the client if
- * the is_closed variable is set to true
+ * handled by data frame function, those that are aren't will have their connection upgraded. It sends data from the
+ * client if the is_send variable is true. It closes the client if the is_closed variable is set to true
  *
  * @param socketfd Socket descriptor
+ * @param is_send To signify that write is available.
  * @param is_close boolean to signify closure of socket.
  */
-void handle_connection(int socketfd, bool is_close);
+void handle_connection(int socketfd, bool is_send, bool is_close);
 
 /**
  * Send http error response and close the connection

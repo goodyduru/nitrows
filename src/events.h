@@ -64,6 +64,14 @@ void init_event_loop();
 void add_to_event_loop(int socketfd);
 
 /**
+ * This function enables or disables the write availability detection for a socket.
+ *
+ * @param socketfd socket descriptor to enable or disable write availability detection
+ * @param enable Boolean to enable or disable write availability detection.
+ */
+void set_write_notify(int socketfd, bool enable);
+
+/**
  * Deletes file descriptor from event loop. We will decrease the event object
  * array size if the number of file descriptors falls below a chosen threshold.
  *
@@ -80,5 +88,5 @@ void delete_from_event_loop(int socketfd);
  * that is ready to be read.
  * @param handle_others function that runs if it's other sockets.
  */
-void run_event_loop(int listener, void (*handle_listener)(int), void (*handle_others)(int, bool));
+void run_event_loop(int listener, void (*handle_listener)(int), void (*handle_others)(int, bool, bool));
 #endif

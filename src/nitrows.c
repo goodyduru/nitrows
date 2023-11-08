@@ -1,3 +1,5 @@
+#include "nitrows.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -6,7 +8,6 @@
 #include "frame.h"
 #include "handlers.h"
 #include "net.h"
-#include "nitrows.h"
 #include "permessage-deflate.h"
 #include "server.h"
 
@@ -21,9 +22,7 @@ void nitrows_set_message_handler(bool (*handle_message)(int, uint8_t *, uint64_t
   set_message_handler(handle_message);
 }
 
-bool nitrows_send_message(int key, uint8_t *message, uint64_t length) {
-  return send_data_frame(key, message, length);
-}
+bool nitrows_send_message(int key, uint8_t *message, uint64_t length) { return send_data_frame(key, message, length); }
 
 void nitrows_run() {
   nitrows_register_extension("permessage-deflate", pmd_validate_offer, pmd_respond, pmd_process_data,

@@ -7,7 +7,7 @@
 typedef struct NitrowsHandler NitrowsHandler;
 
 struct NitrowsHandler {
-    bool (*handle_message)(int, uint8_t *, uint64_t);
+  bool (*handle_message)(int, uint8_t *, uint64_t);
 };
 
 static NitrowsHandler nitrows_handler;

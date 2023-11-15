@@ -8,6 +8,69 @@
 
 #include "server.h"
 
+void add_request(int socketfd, char buffer[], int buffer_len) {
+  // We are going to use socketfd as the hashtable key
+  int index = socketfd % INCOMPLETE_REQUEST_TABLE_SIZE;
+  IncompleteRequest *incomplete_request = (IncompleteRequest *)malloc(sizeof(IncompleteRequest));
+  incomplete_request->buffer_size = buffer_len;
+  incomplete_request->socketfd = socketfd;
+  memcpy(incomplete_request->buffer, buffer, buffer_len);
+
+  incomplete_request->next = incomplete_request_table[index];
+  incomplete_request_table[index] = incomplete_request;
+}
+
+IncompleteRequest *get_request(int socketfd) {
+  // We get the index of the incomplete header struct using the socket descriptor as
+  // key. We then search the linked list to get the incomplete_request containing
+  // the client.
+  int index = socketfd % INCOMPLETE_REQUEST_TABLE_SIZE;
+  IncompleteRequest *incomplete_request = incomplete_request_table[index];
+  while (incomplete_request != NULL) {
+    if (incomplete_request->socketfd == socketfd) {
+      break;
+    }
+    incomplete_request = incomplete_request->next;
+  }
+  return incomplete_request;
+}
+
+void delete_request(IncompleteRequest *request) {
+  int index = request->socketfd % INCOMPLETE_REQUEST_TABLE_SIZE;
+
+  IncompleteRequest *prev = incomplete_request_table[index];
+  IncompleteRequest *current = NULL;
+  // Nothing is found in table. That will be strange, but we want to be robust
+  if (prev == NULL) {
+    free(request);
+    return;
+  }
+
+  // If incomplete request is at the beginning of the list. Set beginning of list to the next incomplete request. Free
+  // incomplete request
+  if (prev->socketfd == request->socketfd) {
+    current = prev;
+    incomplete_request_table[index] = current->next;
+    free(current);
+    return;
+  }
+
+  // Search for client in list
+  current = prev->next;
+  while (current != NULL) {
+    if (current->socketfd == request->socketfd) {
+      prev->next = current->next;
+      break;
+    }
+    prev = current;
+    current = current->next;
+  }
+
+  if (current != NULL) {
+    free(current);
+  }
+}
+
 int16_t move_to_next_line(char *start) {
   char *p = start;
   // Look for carriage return

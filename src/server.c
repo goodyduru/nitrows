@@ -21,7 +21,6 @@ void handle_connection(int socketfd, bool is_send, bool is_close) {
   Client *client = get_client(socketfd);
   if (client == NULL) {
     // If a client is not in the table, then it is probably initiating the websocket protocol by sending a connection
-    // upgrade request. This calls the function that handle the request.
     handle_upgrade(socketfd);
   } else {
     // A client found in the table is more likely sending a frame. This calls the function that handles the frame
@@ -131,6 +130,18 @@ bool __send_upgrade_response(int socketfd, uint8_t key[], char subprotocol[], in
   return true;
 }
 
+bool __is_get_request(char buf[], int16_t buf_length) {
+  if (buf_length < 3) {
+    return true;
+  }
+  // Confirm that request is a GET request.
+  char *p = strstr(buf, "GET");
+  if (p == NULL || p != buf) {
+    return false;
+  }
+  return true;
+}
+
 void handle_upgrade(int socketfd) {
   int16_t nbytes = 0;
   uint16_t total = 0;  // Size Of upgrade request
@@ -141,6 +152,12 @@ void handle_upgrade(int socketfd) {
   uint8_t *extension_indices;
   uint8_t indices_count;
   int subprotocol_len;
+  IncompleteRequest *connection_header = get_request(socketfd);
+  if (connection_header == NULL) {
+    // New connection request, make socket non-blocking
+    fcntl(socketfd, F_SETFL, O_NONBLOCK);
+  }
+
   while ((nbytes = recv(socketfd, buf + total, BUFFER_SIZE - total, 0)) > 0) {
     total += nbytes;
 
@@ -149,38 +166,71 @@ void handle_upgrade(int socketfd) {
       break;
     }
   }
-  subprotocol_len = 0;
-  indices_count = 0;
-  extension_indices = NULL;
 
-  // Close connection if there's an error or client closes connection.
-  if (nbytes <= 0) {
-    if (nbytes == 0) {
-      // Connection closed
-      printf("Closed connection\n");
-    } else {
-      perror("recv");
+  // Close connection if there's an error or client closes connection. If it's a non-blocking error, add the request to
+  // the table.
+  if (nbytes == 0) {
+    // Connection closed
+    printf("Closed connection\n");
+    if (connection_header != NULL) {
+      delete_request(connection_header);
     }
     close_connection(socketfd);
     return;
   }
 
-  // Confirm that request is a GET request.
-  p = strstr(buf, "GET");
-  if (p == NULL || p != buf) {
-    send_error_response(socketfd, 405, "Method not allowed");
+  if (nbytes < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+    perror("recv");
+    if (connection_header != NULL) {
+      delete_request(connection_header);
+    }
     return;
   }
 
-  if (!validate_headers(buf, total, socketfd, key, subprotocol, subprotocol_len, &extension_indices, &indices_count)) {
+  if (nbytes < 0) {
+    if (connection_header == NULL && total < BUFFER_SIZE && __is_get_request(buf, total)) {
+      add_request(socketfd, buf, total);
+    } else if (connection_header == NULL && !__is_get_request(buf, total)) {
+      send_error_response(socketfd, 405, "Method not allowed");
+    } else if (connection_header != NULL && (connection_header->buffer_size + total) < BUFFER_SIZE) {
+      memcpy(connection_header->buffer + connection_header->buffer_size, buf, total);
+      connection_header->buffer_size += total;
+    } else if (connection_header != NULL) {
+      delete_request(connection_header);
+    }
+    return;
+  }
+
+  if (connection_header == NULL && !__is_get_request(buf, nbytes)) {
+    send_error_response(socketfd, 405, "Method not allowed");
+  }
+
+  if (connection_header == NULL) {
+    p = buf;
+  } else {
+    memcpy(connection_header->buffer + connection_header->buffer_size, buf, total);
+    connection_header->buffer_size += total;
+    p = connection_header->buffer;
+    total = connection_header->buffer_size;
+  }
+
+  subprotocol_len = 0;
+  indices_count = 0;
+  extension_indices = NULL;
+
+  if (!validate_headers(p, total, socketfd, key, subprotocol, subprotocol_len, &extension_indices, &indices_count)) {
+    if (connection_header != NULL) {
+      delete_request(connection_header);
+    }
     return;
   }
 
   bool sent = __send_upgrade_response(socketfd, key, subprotocol, subprotocol_len, extension_indices, indices_count);
   if (sent == true) {
     init_client(socketfd, extension_indices, indices_count);
-    // Make socket non-blocking
-    fcntl(socketfd, F_SETFL, O_NONBLOCK);
+  }
+  if (connection_header != NULL) {
+    delete_request(connection_header);
   }
 }
 

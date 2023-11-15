@@ -9,6 +9,50 @@
 #include "extension.h"
 
 #define CLIENT_ERROR 400
+#define INCOMPLETE_REQUEST_TABLE_SIZE 128
+
+/**
+ * Due to unreliable network, a client might not send a complete connection request header. This table is used to store
+ * an incomplete connection request. This should be used sparingly based on the standard header size and current network
+ * conditions. The struct and struct table is defined below
+ */
+typedef struct incomplete_request IncompleteRequest;
+
+struct incomplete_request {
+  int socketfd;
+  uint16_t buffer_size;
+  char buffer[4096];
+  IncompleteRequest *next;
+};
+
+// Table containing all the currently processed connection requests.
+static IncompleteRequest *incomplete_request_table[INCOMPLETE_REQUEST_TABLE_SIZE];
+
+/**
+ * Initialize an incomplete request structure and add it to the table
+ *
+ * @param socketfd  socket descriptor
+ * @param buffer Buffer containing the response
+ * @param buffer_len Length of buffer
+ * @return created client struct
+ */
+void add_request(int socketfd, char buffer[], int buffer_len);
+
+/**
+ * Get an incomplete request structure from the table
+ *
+ * @param socketfd socket descriptor
+ * @return incomplete request struct. Null if not found
+ */
+IncompleteRequest *get_request(int socketfd);
+
+/**
+ * Delete an incomplete request struct from the table
+ *
+ * @param client Pointer to incomplete request struct
+ */
+void delete_request(IncompleteRequest *request);
+
 /**
  * Move header to next line and make sure newlines are valid.
  *

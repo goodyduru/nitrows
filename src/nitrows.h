@@ -29,7 +29,7 @@ void nitrows_register_extension(char *key, bool (*validate_offer)(int, Extension
  * @param handle_message: Handler for a websocket message.  This function must accept the following parameters: An
  * integer which is the WebSocket client key, A string which is the message, and an integer which is the message length.
  */
-void nitrows_set_message_handler(bool (*handle_message)(int, uint8_t *, uint64_t));
+void nitrows_set_message_handler(void (*handle_message)(int, uint8_t *, uint64_t));
 
 /**
  * This function sends a websocket message
@@ -39,6 +39,13 @@ void nitrows_set_message_handler(bool (*handle_message)(int, uint8_t *, uint64_t
  * @param length: Message Length
  */
 bool nitrows_send_message(int key, uint8_t *message, uint64_t length);
+
+/**
+ * This function closes a websocket connection
+ *
+ * @param key: Key to get the websocket client.
+ */
+void nitrows_close(int key);
 
 void nitrows_run();
 #endif

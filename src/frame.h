@@ -124,10 +124,20 @@ bool send_ping_frame(Client *client, uint8_t *message, uint8_t size);
 /**
  * Send data frame
  *
- * @param client Connected client
+ * @param socketfd Socket for the client receiving the message.
  * @param message Data message
+ * @param size Size of the message
  *
  * @returns true if successful, else false
  */
 bool send_data_frame(int socketfd, uint8_t *message, uint64_t size);
+
+/**
+ * Start closing client containing whose socket is set to @param socket.
+ *
+ * @param socketfd Socket for the client receiving the message.
+ *
+ * @returns true if successful, else false
+ */
+void start_closing(int socketfd);
 #endif

@@ -442,8 +442,8 @@ int64_t handle_data_frame(Client *client, uint8_t buf[], int size) {
     } else {
       length = frame->filled_size;
     }
-    bool is_sent = handler->handle_message(client->socketfd, data, length);
-    if (!is_sent) {
+    handler->handle_message(client->socketfd, data, length);
+    if (client->status == CLOSING) {
       return -1;
     }
   } else {
@@ -577,4 +577,9 @@ bool send_data_frame(int socketfd, uint8_t *message, uint64_t size) {
     client->output_frame.buffer = NULL;
   }
   return is_sent;
+}
+
+void start_closing(int socketfd) {
+  Client *client = get_client(socketfd);
+  client->status = CLOSING;
 }

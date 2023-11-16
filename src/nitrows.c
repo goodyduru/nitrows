@@ -18,11 +18,13 @@ void nitrows_register_extension(char *key, bool (*validate_offer)(int, Extension
   register_extension(key, validate_offer, respond_to_offer, process_data, generate_data, close);
 }
 
-void nitrows_set_message_handler(bool (*handle_message)(int, uint8_t *, uint64_t)) {
+void nitrows_set_message_handler(void (*handle_message)(int, uint8_t *, uint64_t)) {
   set_message_handler(handle_message);
 }
 
 bool nitrows_send_message(int key, uint8_t *message, uint64_t length) { return send_data_frame(key, message, length); }
+
+void nitrows_close(int key) { start_closing(key); }
 
 void nitrows_run() {
   nitrows_register_extension("permessage-deflate", pmd_validate_offer, pmd_respond, pmd_process_data,

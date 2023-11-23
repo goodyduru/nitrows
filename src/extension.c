@@ -219,19 +219,25 @@ void print_list(ExtensionList *list) {
   ExtensionParam *param = NULL;
   char truthy[] = "true";
   char falsy[] = "false";
+  char key[EXTENSION_TOKEN_LENGTH + 1];
+  char value[EXTENSION_TOKEN_LENGTH + 1];
   while (list != NULL) {
     printf("Key: %s\n", list->token);
     param = list->params;
     while (param != NULL) {
+      strncpy(key, param->key.start, param->key.length);
+      key[param->key.length] = '\0';
       switch (param->value_type) {
         case BOOL:
-          printf("\t%s=%s\n", param->key, (param->bool_type ? truthy : falsy));
+          printf("\t%s=%s\n", key, (param->bool_type ? truthy : falsy));
           break;
         case INT:
-          printf("\t%s=%lld\n", param->key, param->int_type);
+          printf("\t%s=%lld\n", key, param->int_type);
           break;
         case STRING:
-          printf("\t%s=%s\n", param->key, param->string_type);
+          strncpy(value, param->string_type.start, param->string_type.length);
+          value[param->string_type.length] = '\0';
+          printf("\t%s=%s\n", key, value);
         default:
           printf("Empty\n");
       }

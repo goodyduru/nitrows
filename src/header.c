@@ -194,7 +194,6 @@ int16_t parse_extensions(int socketfd, char *line, ExtensionList *extension_list
   }
   char *start = NULL;
   int8_t i = 0;
-  int8_t key_length = 0;
   int8_t length = 0;
   bool is_digit = false;
   bool has_extension = false;
@@ -250,7 +249,6 @@ int16_t parse_extensions(int socketfd, char *line, ExtensionList *extension_list
         current_params->next = calloc(1, sizeof(ExtensionParam));
         current_params = current_params->next;
       }
-      key_length = strlen(current_params->key);
       is_digit = true;
       for (i = 0; i < length; i++) {
         is_digit &= isdigit(*(start + i));
@@ -258,17 +256,17 @@ int16_t parse_extensions(int socketfd, char *line, ExtensionList *extension_list
           break;
         }
       }
-      if (key_length == 0 && !is_digit) {
-        strncpy(current_params->key, start, length);
-        current_params->key[length] = '\0';
+      if (current_params->key.length == 0 && !is_digit) {
+        current_params->key.length = length;
+        current_params->key.start = start;
         if (c == ',' || c == ';') {
           current_params->value_type = BOOL;
           current_params->bool_type = true;
         }
       } else if (is_digit) {
         if (c == '=') {
-          strncpy(current_params->key, start, length);
-          current_params->string_type[length] = '\0';
+          current_params->string_type.start = start;
+          current_params->string_type.length = length;
           current_params->value_type = STRING;
         } else {
           for (i = 0; i < length; i++) {
@@ -276,9 +274,9 @@ int16_t parse_extensions(int socketfd, char *line, ExtensionList *extension_list
           }
           current_params->value_type = INT;
         }
-      } else if (key_length > 0) {
-        strncpy(current_params->string_type, start, length);
-        current_params->string_type[length] = '\0';
+      } else if (current_params->key.length > 0) {
+        current_params->string_type.length = length;
+        current_params->string_type.start = start;
         current_params->value_type = STRING;
       }
       if (c == ',') {
@@ -326,7 +324,6 @@ int16_t parse_extensions(int socketfd, char *line, ExtensionList *extension_list
       current_params->next = calloc(1, sizeof(ExtensionParam));
       current_params = current_params->next;
     }
-    key_length = strlen(current_params->key);
     is_digit = true;
     for (i = 0; i < length; i++) {
       is_digit &= isdigit(*(start + i));
@@ -334,9 +331,9 @@ int16_t parse_extensions(int socketfd, char *line, ExtensionList *extension_list
         break;
       }
     }
-    if (key_length == 0 && !is_digit) {
-      strncpy(current_params->key, start, length);
-      current_params->key[length] = '\0';
+    if (current_params->key.length == 0 && !is_digit) {
+      current_params->key.length = length;
+      current_params->key.start = start;
       current_params->value_type = BOOL;
       current_params->bool_type = true;
     } else if (is_digit) {
@@ -344,9 +341,9 @@ int16_t parse_extensions(int socketfd, char *line, ExtensionList *extension_list
         current_params->int_type = current_params->int_type * 10 + (*(start + i) - '0');
       }
       current_params->value_type = INT;
-    } else if (key_length > 0) {
-      strncpy(current_params->string_type, start, length);
-      current_params->string_type[length] = '\0';
+    } else if (current_params->key.length > 0) {
+      current_params->string_type.start = start;
+      current_params->string_type.length = length;
       current_params->value_type = STRING;
     }
     current_params->is_last = true;

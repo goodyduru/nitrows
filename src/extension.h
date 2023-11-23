@@ -34,15 +34,20 @@ enum ValueType { EMPTY, INT, BOOL, STRING };
  * member set to true, while that of client_max_window_bit is_last member set
  * to false.
  */
+struct str {
+  char *start;
+  uint8_t length;
+};
+
 typedef struct extension_param ExtensionParam;
 
 struct extension_param {
-  char key[EXTENSION_TOKEN_LENGTH + 1];
+  struct str key;
   ValueType value_type;
   union {
     int64_t int_type;
     bool bool_type;
-    char string_type[EXTENSION_TOKEN_LENGTH + 1];
+    struct str string_type;
   };
   bool is_last;
   ExtensionParam *next;

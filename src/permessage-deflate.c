@@ -71,7 +71,7 @@ bool pmd_validate_offer(int socketfd, ExtensionParam *param) {
   PMDClientConfig *config = calloc(1, sizeof(PMDClientConfig));
 
   while (param != NULL) {
-    if (strlen(param->key) == 0) {
+    if (param->key.length == 0) {
       config->socketfd = socketfd;
       config->client_max_window_bits = MAX_WINDOW_BITS;
       config->server_max_window_bits = MAX_WINDOW_BITS;
@@ -81,7 +81,7 @@ bool pmd_validate_offer(int socketfd, ExtensionParam *param) {
       pmd_add_to_table(config);
       break;
     }
-    if (strcasecmp("client_max_window_bits", param->key) == 0) {
+    if (strncasecmp("client_max_window_bits", param->key.start, param->key.length) == 0) {
       if (has_seen_client_max_window_bits || param->value_type == STRING ||
           (param->value_type == INT && (param->int_type < 8 || param->int_type > 15))) {
         acceptable &= false;
@@ -93,7 +93,7 @@ bool pmd_validate_offer(int socketfd, ExtensionParam *param) {
         client_max_window_bits = param->int_type;
       }
       has_seen_client_max_window_bits = true;
-    } else if (strcasecmp("server_max_window_bits", param->key) == 0) {
+    } else if (strncasecmp("server_max_window_bits", param->key.start, param->key.length) == 0) {
       if (has_seen_server_max_window_bits || param->value_type == STRING ||
           (param->value_type == INT && (param->int_type < 8 || param->int_type > 15))) {
         acceptable &= false;
@@ -105,14 +105,14 @@ bool pmd_validate_offer(int socketfd, ExtensionParam *param) {
         server_max_window_bits = param->int_type;
       }
       has_seen_server_max_window_bits = true;
-    } else if (strcasecmp("client_no_context_takeover", param->key) == 0) {
+    } else if (strncasecmp("client_no_context_takeover", param->key.start, param->key.length) == 0) {
       if (has_seen_client_context_takeover || param->value_type != BOOL) {
         acceptable &= false;
         break;
       }
       client_no_context_takeover = true;
       has_seen_client_context_takeover = true;
-    } else if (strcasecmp("server_no_context_takeover", param->key) == 0) {
+    } else if (strncasecmp("server_no_context_takeover", param->key.start, param->key.length) == 0) {
       if (has_seen_server_context_takeover || param->value_type != BOOL) {
         acceptable &= false;
         break;

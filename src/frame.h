@@ -16,7 +16,7 @@
 
 #ifdef __unix__
 #define htonll(x) htobe64(x)
-#define ntohll(x) betoh64(x)
+#define ntohll(x) be64toh(x)
 #endif
 
 

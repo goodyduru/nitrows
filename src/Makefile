@@ -8,13 +8,18 @@ PRODUCT = nitrows
 
 # What we're building with
 CXX = clang
+ifeq ($(PLATFORM),Darwin)
 CFLAGS := -Wall -std=gnu99 -I/usr/local/opt/openssl/include
+LDFLAGS = -L/usr/local/opt/openssl/lib -lz -lcrypto
+else
+CFLAGS := -Wall -std=gnu99
+LDFLAGS := -lz -lcrypto
+endif
 CFLAGS_DEBUG := -g -DDEBUG -O0
 CFLAGS_ASAN := -O1 -g -fsanitize=address
 CFLAGS_RELEASE :=  -O3
 TIDY := clang-tidy
 FORMAT := clang-format
-LDFLAGS = -L/usr/local/opt/openssl/lib -lz -lcrypto
 ifeq ($(DEBUG),1)
   CFLAGS := $(CFLAGS_DEBUG) $(CFLAGS)
 else ifeq ($(ASAN),1)

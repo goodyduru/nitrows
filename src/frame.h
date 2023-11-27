@@ -9,16 +9,15 @@
 #ifdef __linux__
 #include <endian.h>
 #elif defined(__FreeBSD__) || defined(__NetBSD__)
-#  include <sys/endian.h>
+#include <sys/endian.h>
 #elif defined(__OpenBSD__)
-#  include <sys/types.h>
+#include <sys/types.h>
 #endif
 
 #ifdef __unix__
 #define htonll(x) htobe64(x)
 #define ntohll(x) be64toh(x)
 #endif
-
 
 #define MAX_PAYLOAD_VALUE 127
 

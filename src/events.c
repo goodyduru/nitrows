@@ -38,9 +38,8 @@ void set_write_notify(int socketfd, bool enable) {
 }
 
 void delete_from_event_loop(int socketfd) {
-  if (epoll_ctl(epollfd, EPOLL_CTL_DEL, socketfd, NULL) == -1) {
-    perror("epoll_ctl: socketfd");
-  }
+  // Closing a socket automatically removes it from the epoll set. We maintain this empty function because it is called
+  // in a platform agnostic manner. Other platforms requires explicit removal.
 }
 
 void run_event_loop(int listener, void (*handle_listener)(int), void (*handle_others)(int, bool, bool)) {

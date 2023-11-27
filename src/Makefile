@@ -8,7 +8,7 @@ PRODUCT = nitrows
 
 # What we're building with
 CXX = clang
-CFLAGS := -Wall -std=c99 -I/usr/local/opt/openssl/include
+CFLAGS := -Wall -std=gnu99 -I/usr/local/opt/openssl/include
 CFLAGS_DEBUG := -g -DDEBUG -O0
 CFLAGS_ASAN := -O1 -g -fsanitize=address
 CFLAGS_RELEASE :=  -O3

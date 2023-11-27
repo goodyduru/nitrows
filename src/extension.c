@@ -232,7 +232,7 @@ void print_list(ExtensionList *list) {
           printf("\t%s=%s\n", key, (param->bool_type ? truthy : falsy));
           break;
         case INT:
-          printf("\t%s=%lld\n", key, param->int_type);
+          printf("\t%s=%ld\n", key, param->int_type);
           break;
         case STRING:
           strncpy(value, param->string_type.start, param->string_type.length);

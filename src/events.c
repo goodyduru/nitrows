@@ -43,7 +43,7 @@ void delete_from_event_loop(int socketfd) {
   }
 }
 
-void run_event_loop(int listener, void (*handle_listener)(int), void (*handle_others)(int, bool)) {
+void run_event_loop(int listener, void (*handle_listener)(int), void (*handle_others)(int, bool, bool)) {
   struct epoll_event curr_event;
   while (1) {
     int event_count = epoll_wait(epollfd, nitrows_event.objects, INITIAL_EVENT_SIZE, -1);

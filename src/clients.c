@@ -133,10 +133,10 @@ void print_client(Client *client) {
   printf("Mask size: %d\n", client->mask_size);
   printf("Mask: %x%x%x%x\n", client->mask[0], client->mask[1], client->mask[2], client->mask[3]);
   printf("Control type: %d\n", client->control_frame.type);
-  printf("Control data size: %llu\n", client->control_frame.buffer_size);
+  printf("Control data size: %lu\n", client->control_frame.buffer_size);
   printf("Data type: %d\n", client->data_frame.type);
-  printf("Data payload size: %llu\n", client->data_frame.payload_size);
-  printf("Current data frame start: %llu\n", client->data_frame.current_fragment_offset);
-  printf("Buffer size: %llu\n", client->data_frame.filled_size);
-  printf("Buffer max size: %llu\n", client->data_frame.buffer_size);
+  printf("Data payload size: %lu\n", client->data_frame.payload_size);
+  printf("Current data frame start: %lu\n", client->data_frame.current_fragment_offset);
+  printf("Buffer size: %lu\n", client->data_frame.filled_size);
+  printf("Buffer max size: %lu\n", client->data_frame.buffer_size);
 }

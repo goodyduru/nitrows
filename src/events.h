@@ -31,7 +31,8 @@ typedef struct Event Event;
 #ifdef __linux__
 struct Event {
   struct epoll_event objects[INITIAL_EVENT_SIZE];
-} static int epollfd;
+};
+static int epollfd;
 #elif defined(__unix__) || defined(__APPLE__)
 struct Event {
   uint64_t count;

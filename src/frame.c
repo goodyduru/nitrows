@@ -326,7 +326,7 @@ int8_t handle_control_frame(Client *client, uint8_t buf[], int size) {
 int64_t handle_data_frame(Client *client, uint8_t buf[], int size) {
   int64_t read = 0;
   Frame *frame = &client->data_frame;
-  uint8_t *data = frame->buffer;
+  uint8_t *data;
   uint8_t *temp;
 
   // Avoid unnecessary copies and allocations. We can use the buf directly.
@@ -341,12 +341,12 @@ int64_t handle_data_frame(Client *client, uint8_t buf[], int size) {
     // If buf is part of the frame data frame buffer, we just need to increase filled size attribute
     frame->filled_size += size;
     read = size;
+    data = frame->buffer;
   } else if (frame->payload_size > 0) {
     // Allocate or increase size if we don't have enough space
     if (frame->buffer == NULL) {
       frame->buffer = (uint8_t *)malloc(frame->payload_size);
       frame->buffer_size = frame->payload_size;
-      data = frame->buffer;
     } else if ((frame->buffer_size - frame->current_fragment_offset) < frame->payload_size) {
       uint64_t remaining_space = frame->payload_size - (frame->buffer_size - frame->current_fragment_offset);
       if ((frame->buffer_size + remaining_space) > MAX_PAYLOAD_SIZE) {
@@ -362,14 +362,16 @@ int64_t handle_data_frame(Client *client, uint8_t buf[], int size) {
         return -1;
       }
       frame->buffer = temp;
-      data = frame->buffer;
     }
     uint64_t to_copy_size = frame->payload_size - (frame->filled_size - frame->current_fragment_offset);
     to_copy_size = (to_copy_size >= size) ? size : to_copy_size;
 
-    memcpy(data + frame->filled_size, buf, to_copy_size);
+    memcpy(frame->buffer + frame->filled_size, buf, to_copy_size);
     frame->filled_size += to_copy_size;
     read += to_copy_size;
+    data = frame->buffer;
+  } else {
+    data = frame->buffer;
   }
   uint64_t current_frame_size = frame->filled_size - frame->current_fragment_offset;
   // Unmask data with current mask data if end of the current frame payload

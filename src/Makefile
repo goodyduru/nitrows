@@ -18,7 +18,7 @@ else
 endif
 CFLAGS_DEBUG := -g -DDEBUG -O0
 CFLAGS_ASAN := -O1 -g -fsanitize=address
-CFLAGS_RELEASE :=  -O3
+CFLAGS_RELEASE :=  -O3 -g
 TIDY := clang-tidy
 FORMAT := clang-format
 ifeq ($(DEBUG),1)

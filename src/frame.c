@@ -572,7 +572,7 @@ bool send_data_frame(int socketfd, uint8_t *message, uint64_t size) {
   memcpy(final_frame + size_length + 2, message, size);
   bool is_sent = send_frame(client, final_frame, size + size_length + 2);
   free(final_frame);
-  if (client->output_frame.buffer != NULL) {
+  if (client->indices_count > 0 && client->output_frame.buffer != NULL) {
     free(client->output_frame.buffer);
     client->output_frame.buffer_size = 0;
     client->output_frame.payload_size = 0;

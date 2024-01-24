@@ -1,21 +1,21 @@
 # Nitrows: A WebSocket Server
 Nitrows is very easy to use. Here's how
 
-    ```C
-        #include "nitrows.h"
-        
-        void echo_message(int client_id, uint8_t *message, uint64_t length) {
-            bool is_sent = nitrows_send_message(client_id, message, length);
-            if (!is_sent) {
-                nitrows_close(client_id);
-            }
-        }
+```c
+#include "nitrows.h"
 
-        int main() {
-            nitrows_set_message_handler(echo_message);
-            nitrows_run();
-        }
-    ```
+void echo_message(int client_id, uint8_t *message, uint64_t length) {
+    bool is_sent = nitrows_send_message(client_id, message, length);
+    if (!is_sent) {
+        nitrows_close(client_id);
+    }
+}
+
+int main() {
+    nitrows_set_message_handler(echo_message);
+    nitrows_run();
+}
+```
 
 You create a message handler function that accepts 3 parameters, the client_id, the Websocket message, and the size of the message. You pass that function as a parameter to the `nitrows_set_message_handler` function, then run the `nitrows_run` function. And that's it, you now have a working websocket server.
 

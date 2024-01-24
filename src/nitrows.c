@@ -22,9 +22,11 @@ void nitrows_set_message_handler(void (*handle_message)(int, uint8_t *, uint64_t
   set_message_handler(handle_message);
 }
 
-bool nitrows_send_message(int key, uint8_t *message, uint64_t length) { return send_data_frame(key, message, length); }
+bool nitrows_send_message(int client_id, uint8_t *message, uint64_t length) {
+  return send_data_frame(client_id, message, length);
+}
 
-void nitrows_close(int key) { start_closing(key); }
+void nitrows_close(int client_id) { start_closing(client_id); }
 
 void nitrows_run() {
   nitrows_register_extension("permessage-deflate", pmd_validate_offer, pmd_respond, pmd_process_data,

@@ -3,10 +3,10 @@
 #include "header.h"
 #include "nitrows.h"
 
-void echo_message(int key, uint8_t *message, uint64_t length) {
-  bool is_sent = nitrows_send_message(key, message, length);
+void echo_message(int client_id, uint8_t *message, uint64_t length) {
+  bool is_sent = nitrows_send_message(client_id, message, length);
   if (!is_sent) {
-    nitrows_close(key);
+    nitrows_close(client_id);
   }
 }
 

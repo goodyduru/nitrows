@@ -34,18 +34,18 @@ void nitrows_set_message_handler(void (*handle_message)(int, uint8_t *, uint64_t
 /**
  * This function sends a websocket message
  *
- * @param key: Key to get a WebSocket Client
+ * @param client_id: WebSocket Client ID
  * @param message: Message to be sent.
  * @param length: Message Length
  */
-bool nitrows_send_message(int key, uint8_t *message, uint64_t length);
+bool nitrows_send_message(int client_id, uint8_t *message, uint64_t length);
 
 /**
  * This function closes a websocket connection
  *
- * @param key: Key to get the websocket client.
+ * @param client_id: WebSocket client id.
  */
-void nitrows_close(int key);
+void nitrows_close(int client_id);
 
 void nitrows_run();
 #endif
